@@ -150,7 +150,7 @@ async function storeCustomerMessage(messageData) {
     
     // Add new message to conversations
     const newMessage = {
-      id: admin.firestore.FieldValue.serverTimestamp(),
+      id: messageData.channelData.twilioSid || `msg_${Date.now()}`,
       timestamp: messageData.timestamp,
       channel: messageData.channel,
       direction: messageData.direction,
@@ -249,7 +249,7 @@ async function sendReplyToCustomer(customerId, message) {
     if (success) {
       // Store outbound message in Firestore
       const outboundMessage = {
-        id: admin.firestore.FieldValue.serverTimestamp(),
+        id: `msg_${Date.now()}`,
         timestamp: new Date(),
         channel: 'sms',
         direction: 'outbound',
