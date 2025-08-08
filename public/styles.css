@@ -30,6 +30,12 @@ header {
     margin-bottom: 20px;
 }
 
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
 header h1 {
     color: #2d3748;
     font-size: 1.8rem;

@@ -78,6 +78,12 @@ function setupEventListeners() {
     if (updatePreviewsBtn) {
         updatePreviewsBtn.addEventListener('click', updateMessagePreviews);
     }
+
+    // Logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
+    }
     
     // Select All button
     const selectAllBtn = document.getElementById('select-all-btn');
@@ -1107,5 +1113,29 @@ function updateCharCount(textareaId) {
         counter.classList.add('warning');
     } else {
         counter.classList.add('danger');
+    }
+}
+
+// Logout functionality
+async function handleLogout() {
+    try {
+        const response = await fetch('/auth/logout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Redirect to login page
+            window.location.href = '/login';
+        } else {
+            showError('Logout failed. Please try again.');
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+        showError('Logout failed. Please try again.');
     }
 }

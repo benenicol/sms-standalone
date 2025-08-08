@@ -10,6 +10,7 @@ console.log('📡 Port:', process.env.PORT || 3000);
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const session = require('express-session');
 const path = require('path');
 
 const app = express();
@@ -64,7 +65,65 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static files - Vercel-compatible configuration
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-fallback-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Static files - serve login.html without authentication
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Authentication credentials
+const AUTH_EMAIL = 'orders@allynview.com.au';
+const AUTH_PASSWORD = 'allynview2026';
+
+// Authentication routes
+app.post('/auth/login', (req, res) => {
+  const { email, password } = req.body;
+  
+  if (email === AUTH_EMAIL && password === AUTH_PASSWORD) {
+    req.session.authenticated = true;
+    res.json({ success: true, message: 'Login successful' });
+  } else {
+    res.status(401).json({ success: false, message: 'Invalid email or password' });
+  }
+});
+
+app.post('/auth/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Logout failed' });
+    }
+    res.json({ success: true, message: 'Logout successful' });
+  });
+});
+
+// Authentication middleware
+const requireAuth = (req, res, next) => {
+  if (req.session.authenticated) {
+    return next();
+  }
+  
+  // If it's an API request, return JSON
+  if (req.path.startsWith('/api/') || req.path.startsWith('/webhook/')) {
+    return res.status(401).json({ success: false, message: 'Authentication required' });
+  }
+  
+  // For regular requests, redirect to login
+  res.redirect('/login');
+};
+
+// Static files - Vercel-compatible configuration (protected)
+app.use(requireAuth);
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, path) => {
     if (path.endsWith('.css')) {
@@ -91,9 +150,9 @@ try {
   process.exit(1);
 }
 
-// Routes
+// Routes - webhooks are public, SMS API requires authentication
 app.use('/webhook', webhookRoutes);
-app.use('/api/sms', smsRoutes);
+app.use('/api/sms', requireAuth, smsRoutes);
 
 // Serve main interface
 app.get('/', (req, res) => {
