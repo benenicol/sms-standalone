@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMS Notification Manager</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📱 SMS Notification Manager</h1>
+            <div class="status-indicator" id="status">
+                <span class="dot"></span>
+                <span id="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab active" onclick="showTab('orders', event)">📦 Orders</button>
+            <button class="tab" onclick="showTab('conversations', event)">💬 Conversations</button>
+            <button class="tab" onclick="showTab('test', event)">🧪 Test</button>
+        </nav>
+
+        <!-- Orders Tab -->
+        <div id="orders-tab" class="tab-content active">
+            <div class="section">
+                <h2>📦 Order Notifications</h2>
+                
+                <div class="filters">
+                    <div class="filter-group">
+                        <label for="order-status">Order Status:</label>
+                        <select id="order-status">
+                            <option value="fulfilled">Fulfilled</option>
+                            <option value="pending">Pending</option>
+                            <option value="shipped">Shipped</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="days">Last N Days:</label>
+                        <select id="days">
+                            <option value="1">1 Day</option>
+                            <option value="3">3 Days</option>
+                            <option value="7" selected>7 Days</option>
+                            <option value="14">14 Days</option>
+                            <option value="30">30 Days</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="tag">Filter by Tag:</label>
+                        <input type="text" id="tag" placeholder="e.g. subscription">
+                    </div>
+                    
+                    <button onclick="loadOrders()" class="btn btn-primary">🔄 Load Orders</button>
+                </div>
+
+                <div class="message-template">
+                    <h3>📝 Message Template</h3>
+                    <textarea id="message-template" rows="4" placeholder="Hi {customerName}, your order #{orderNumber} is ready! Delivery method: {deliveryMethod}">Hi {customerName}, your order #{orderNumber} is ready for {deliveryMethod}! 🎉
+
+Thank you for your order of {totalPrice}.</textarea>
+                    <div class="template-help">
+                        <p>Available placeholders: <code>{customerName}</code>, <code>{orderNumber}</code>, <code>{deliveryMethod}</code>, <code>{totalPrice}</code></p>
+                        <div class="char-counter">
+                            <span id="char-count">0</span>/160 characters
+                        </div>
+                    </div>
+                </div>
+
+                <div id="orders-list" class="orders-container">
+                    <div class="loading">Click "Load Orders" to get started</div>
+                </div>
+
+                <div class="bulk-actions" id="bulk-actions" style="display: none;">
+                    <div class="selected-count">
+                        <span id="selected-count">0</span> orders selected
+                    </div>
+                    <button onclick="sendBulkSMS(true)" class="btn btn-secondary">🧪 Test Send</button>
+                    <button onclick="sendBulkSMS(false)" class="btn btn-danger">📤 Send SMS</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conversations Tab -->
+        <div id="conversations-tab" class="tab-content">
+            <div class="conversation-layout">
+                <div class="customer-list">
+                    <h3>💬 Customer Conversations</h3>
+                    <button onclick="loadConversations()" class="btn btn-primary btn-small">🔄 Refresh</button>
+                    <div id="customer-list" class="customer-items">
+                        <div class="loading">Loading conversations...</div>
+                    </div>
+                </div>
+                
+                <div class="conversation-panel">
+                    <div id="conversation-header" class="conversation-header" style="display: none;">
+                        <div class="customer-info">
+                            <h3 id="selected-customer-name">Select a customer</h3>
+                            <p id="selected-customer-phone"></p>
+                        </div>
+                    </div>
+                    
+                    <div id="conversation-content" class="conversation-content">
+                        <div class="empty-state">
+                            <h3>💬 Select a Customer</h3>
+                            <p>Choose a customer from the list to view their conversation</p>
+                        </div>
+                    </div>
+                    
+                    <div id="quick-reply" class="quick-reply" style="display: none;">
+                        <textarea id="reply-message" placeholder="Type your reply..." rows="3"></textarea>
+                        <button onclick="sendReply()" class="btn btn-primary">📤 Send Reply</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Tab -->
+        <div id="test-tab" class="tab-content">
+            <div class="section">
+                <h2>🧪 Test SMS</h2>
+                <p>Send a test SMS to verify your setup</p>
+                
+                <div class="form-group">
+                    <label for="test-phone">Phone Number:</label>
+                    <input type="tel" id="test-phone" placeholder="+1234567890">
+                </div>
+                
+                <div class="form-group">
+                    <label for="test-message">Message:</label>
+                    <textarea id="test-message" rows="4" placeholder="This is a test message">Hello! This is a test message from your SMS system. 🚀</textarea>
+                </div>
+                
+                <button onclick="sendTestSMS()" class="btn btn-primary">📤 Send Test SMS</button>
+                
+                <div id="test-results" class="results"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Modal -->
+    <div id="results-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Results</h3>
+                <button onclick="closeModal()" class="close-btn">&times;</button>
+            </div>
+            <div id="modal-body" class="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

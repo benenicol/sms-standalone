@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Change to the project directory
+cd "/Users/bennicol/development/sms-webhook-standalone"
+
+# Show notification
+osascript -e 'display notification "Restarting SMS Webhook Server..." with title "SMS Webhook"'
+
+# Kill any existing node server processes for this project
+pkill -f "node server.js" 2>/dev/null
+
+# Wait a moment for processes to terminate
+sleep 3
+
+# Load environment variables and start the server with full paths
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+
+# Start the server and keep it running
+nohup node server.js > /tmp/sms-webhook.log 2>&1 &
+
+# Get the process ID
+SERVER_PID=$!
+
+# Wait a bit to make sure server starts
+sleep 2
+
+# Check if server is actually running
+if kill -0 $SERVER_PID 2>/dev/null; then
+    # Show success notification
+    osascript -e 'display notification "Server restarted successfully! Access at http://localhost:3000" with title "SMS Webhook Server" sound name "Glass"'
+    
+    # Optional: Open browser after a delay
+    sleep 2
+    open http://localhost:3000
+else
+    # Show error notification
+    osascript -e 'display notification "Failed to start server. Check /tmp/sms-webhook.log for errors." with title "SMS Webhook Error" sound name "Basso"'
+fi
+
+exit 0
