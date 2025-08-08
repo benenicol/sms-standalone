@@ -609,6 +609,11 @@ header h1 {
     background-color: #f7fafc;
 }
 
+.orders-table tr.selected {
+    background-color: #e0f2fe;
+    border-left: 4px solid #0ea5e9;
+}
+
 .checkbox-column {
     width: 50px;
     text-align: center;

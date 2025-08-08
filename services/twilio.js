@@ -130,12 +130,17 @@ async function sendBulkSMS(orders, messageTemplate, testMode = false) {
         continue;
       }
       
-      // Replace placeholders in message template
-      let personalizedMessage = messageTemplate
-        .replace(/\{customerName\}/g, customerName)
-        .replace(/\{orderNumber\}/g, order.orderNumber)
-        .replace(/\{deliveryMethod\}/g, order.deliveryMethod)
-        .replace(/\{totalPrice\}/g, `$${order.totalPrice}`);
+      // Use individual message if provided, otherwise use template
+      let personalizedMessage;
+      if (order.message) {
+        personalizedMessage = order.message;
+      } else {
+        personalizedMessage = messageTemplate
+          .replace(/\{customerName\}/g, customerName)
+          .replace(/\{orderNumber\}/g, order.orderNumber)
+          .replace(/\{deliveryMethod\}/g, order.deliveryMethod)
+          .replace(/\{totalPrice\}/g, `$${order.totalPrice}`);
+      }
       
       if (testMode) {
         console.log(`🧪 TEST MODE - Would send to ${customerName} (${phone}): ${personalizedMessage}`);

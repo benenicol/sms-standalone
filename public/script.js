@@ -180,9 +180,15 @@ window.loadOrders = async function loadOrders() {
     try {
         updateStatus('connecting', 'Loading orders...');
         
-        const status = document.getElementById('order-status').value;
-        const days = document.getElementById('days').value;
-        const tag = document.getElementById('tag').value;
+        const statusElement = document.getElementById('order-status');
+        const daysElement = document.getElementById('days');
+        const tagElement = document.getElementById('tag-filter');
+        const deliveryFilterElement = document.getElementById('delivery-filter');
+        
+        const status = statusElement ? statusElement.value : 'fulfilled';
+        const days = daysElement ? daysElement.value : '7';
+        const tag = tagElement ? tagElement.value : '';
+        const deliveryFilter = deliveryFilterElement ? deliveryFilterElement.value : 'all';
         
         const params = new URLSearchParams({
             status: status,
@@ -198,9 +204,30 @@ window.loadOrders = async function loadOrders() {
         const data = await response.json();
         
         if (data.success) {
-            currentOrders = data.orders;
+            let orders = data.orders;
+            
+            // Apply delivery method filter
+            if (deliveryFilter !== 'all') {
+                orders = orders.filter(order => {
+                    const deliveryMethod = determineDeliveryMethod(order);
+                    if (deliveryFilter === 'pickup') {
+                        return deliveryMethod === 'Pickup';
+                    } else if (deliveryFilter === 'delivery') {
+                        return deliveryMethod === 'Home Delivery';
+                    }
+                    return true;
+                });
+            }
+            
+            currentOrders = orders;
             displayOrders(currentOrders);
             updateStatus('connected', `${currentOrders.length} orders loaded`);
+            
+            // Show bulk actions if orders are available
+            const bulkActions = document.getElementById('bulk-actions');
+            if (bulkActions) {
+                bulkActions.style.display = orders.length > 0 ? 'flex' : 'none';
+            }
         } else {
             throw new Error(data.error || 'Failed to load orders');
         }
@@ -328,15 +355,17 @@ function displayOrders(orders) {
 }
 
 function toggleOrderSelection(index) {
-    const checkbox = document.querySelector(`[data-index="${index}"] input`);
-    const orderItem = document.querySelector(`[data-index="${index}"]`);
+    const checkbox = document.querySelector(`.order-checkbox[data-index="${index}"]`);
+    const orderRow = checkbox ? checkbox.closest('tr') : null;
     
-    if (checkbox.checked) {
-        selectedOrders.push(currentOrders[index]);
-        orderItem.classList.add('selected');
+    if (checkbox && checkbox.checked) {
+        if (!selectedOrders.find(order => order.id === currentOrders[index].id)) {
+            selectedOrders.push(currentOrders[index]);
+        }
+        if (orderRow) orderRow.classList.add('selected');
     } else {
         selectedOrders = selectedOrders.filter(order => order.id !== currentOrders[index].id);
-        orderItem.classList.remove('selected');
+        if (orderRow) orderRow.classList.remove('selected');
     }
     
     updateBulkActions();
@@ -356,19 +385,57 @@ function updateBulkActions() {
 
 window.sendBulkSMS = async function sendBulkSMS(testMode = false) {
     try {
-        const messageTemplate = document.getElementById('message-template').value;
-        
-        if (!messageTemplate.trim()) {
-            showError('Please enter a message template');
-            return;
-        }
-        
         if (selectedOrders.length === 0) {
             showError('Please select at least one order');
             return;
         }
         
-        updateStatus('connecting', `${testMode ? 'Testing' : 'Sending'} bulk SMS...`);
+        // Collect messages from individual message boxes
+        const bulkData = [];
+        selectedOrders.forEach((order, orderIndex) => {
+            // Find the original index in currentOrders
+            const originalIndex = currentOrders.findIndex(o => o.id === order.id);
+            if (originalIndex >= 0) {
+                const messageBox = document.getElementById(`message-${originalIndex}`);
+                if (messageBox && messageBox.value.trim()) {
+                    const customerName = order.customer?.name || 
+                        `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() ||
+                        'Customer';
+                    const phone = order.customer?.phone || order.billing_address?.phone || order.shipping_address?.phone;
+                    const orderNumber = order.orderNumber || order.name || order.order_number;
+                    
+                    if (phone) {
+                        bulkData.push({
+                            id: order.id,
+                            orderNumber: orderNumber,
+                            customer: {
+                                name: customerName,
+                                phone: phone
+                            },
+                            deliveryMethod: determineDeliveryMethod(order),
+                            totalPrice: order.totalPrice || order.total_price || '0'
+                        });
+                    }
+                }
+            }
+        });
+        
+        if (bulkData.length === 0) {
+            showError('No valid orders with messages and phone numbers found');
+            return;
+        }
+        
+        updateStatus('connecting', `${testMode ? 'Testing' : 'Sending'} ${bulkData.length} SMS messages...`);
+        
+        // Create a custom bulk send with individual messages
+        const bulkMessages = bulkData.map(order => {
+            const originalIndex = currentOrders.findIndex(o => o.id === order.id);
+            const messageBox = document.getElementById(`message-${originalIndex}`);
+            return {
+                ...order,
+                message: messageBox ? messageBox.value.trim() : ''
+            };
+        });
         
         const response = await fetch('/api/sms/bulk', {
             method: 'POST',
@@ -376,8 +443,8 @@ window.sendBulkSMS = async function sendBulkSMS(testMode = false) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                orders: selectedOrders,
-                message: messageTemplate,
+                orders: bulkMessages,
+                message: '', // Not used since each order has its own message
                 testMode: testMode
             })
         });
