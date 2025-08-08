@@ -24,59 +24,52 @@ function setupEventListeners() {
     console.log('🔧 Setting up event listeners...');
     
     // Tab buttons
-    document.querySelectorAll('.tab').forEach((tab, index) => {
-        const tabNames = ['orders', 'conversations', 'test'];
+    document.querySelectorAll('.tab').forEach((tab) => {
         tab.addEventListener('click', function(e) {
-            console.log('Tab clicked:', tabNames[index]);
-            showTab(tabNames[index], e);
+            const tabName = this.getAttribute('data-tab');
+            console.log('Tab clicked:', tabName);
+            showTab(tabName, e);
         });
     });
     
     // Load Orders button
-    const loadOrdersBtn = document.querySelector('button[onclick*="loadOrders"]');
+    const loadOrdersBtn = document.getElementById('load-orders-btn');
     if (loadOrdersBtn) {
-        loadOrdersBtn.onclick = null; // Remove inline handler
         loadOrdersBtn.addEventListener('click', loadOrders);
     }
     
     // Load Conversations button
-    const loadConversationsBtn = document.querySelector('button[onclick*="loadConversations"]');
+    const loadConversationsBtn = document.getElementById('load-conversations-btn');
     if (loadConversationsBtn) {
-        loadConversationsBtn.onclick = null;
         loadConversationsBtn.addEventListener('click', loadConversations);
     }
     
     // Send Test SMS button
-    const sendTestBtn = document.querySelector('button[onclick*="sendTestSMS"]');
+    const sendTestBtn = document.getElementById('send-test-sms-btn');
     if (sendTestBtn) {
-        sendTestBtn.onclick = null;
         sendTestBtn.addEventListener('click', sendTestSMS);
     }
     
     // Send Reply button
-    const sendReplyBtn = document.querySelector('button[onclick*="sendReply"]');
+    const sendReplyBtn = document.getElementById('send-reply-btn');
     if (sendReplyBtn) {
-        sendReplyBtn.onclick = null;
         sendReplyBtn.addEventListener('click', sendReply);
     }
     
     // Bulk SMS buttons
-    const testSendBtn = document.querySelector('button[onclick*="sendBulkSMS(true)"]');
-    if (testSendBtn) {
-        testSendBtn.onclick = null;
-        testSendBtn.addEventListener('click', () => sendBulkSMS(true));
+    const bulkTestBtn = document.getElementById('bulk-test-btn');
+    if (bulkTestBtn) {
+        bulkTestBtn.addEventListener('click', () => sendBulkSMS(true));
     }
     
-    const bulkSendBtn = document.querySelector('button[onclick*="sendBulkSMS(false)"]');
+    const bulkSendBtn = document.getElementById('bulk-send-btn');
     if (bulkSendBtn) {
-        bulkSendBtn.onclick = null;
         bulkSendBtn.addEventListener('click', () => sendBulkSMS(false));
     }
     
     // Close modal button
-    const closeModalBtn = document.querySelector('.close-btn');
+    const closeModalBtn = document.getElementById('close-modal-btn');
     if (closeModalBtn) {
-        closeModalBtn.onclick = null;
         closeModalBtn.addEventListener('click', closeModal);
     }
     
@@ -198,7 +191,7 @@ function displayOrders(orders) {
     
     container.innerHTML = orders.map((order, index) => `
         <div class="order-item" data-index="${index}">
-            <input type="checkbox" class="order-checkbox" onchange="toggleOrderSelection(${index})">
+            <input type="checkbox" class="order-checkbox" data-index="${index}">
             <div class="order-info">
                 <div>
                     <div class="customer-name">${order.customer.name}</div>
@@ -218,6 +211,14 @@ function displayOrders(orders) {
             </div>
         </div>
     `).join('');
+    
+    // Add event listeners to checkboxes
+    container.querySelectorAll('.order-checkbox').forEach((checkbox) => {
+        checkbox.addEventListener('change', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            toggleOrderSelection(index);
+        });
+    });
 }
 
 function toggleOrderSelection(index) {
@@ -326,23 +327,32 @@ function displayConversations(conversations) {
     container.innerHTML = conversations.map((customer, index) => {
         const latestMessage = customer.latestMessage;
         const messagePreview = latestMessage ? 
-            (latestMessage.content.length > 50 ? 
+            (latestMessage.content && latestMessage.content.length > 50 ? 
                 latestMessage.content.substring(0, 50) + '...' : 
-                latestMessage.content) : 
+                latestMessage.content || 'No content') : 
             'No messages';
         
-        const timestamp = latestMessage ? 
-            formatTimestamp(new Date(latestMessage.timestamp)) : '';
+        const timestamp = latestMessage && latestMessage.timestamp ? 
+            formatTimestamp(latestMessage.timestamp) : '';
         
         return `
-            <div class="customer-item" onclick="selectCustomer('${customer.customerId}', ${index})">
+            <div class="customer-item" data-customer-id="${customer.customerId}" data-index="${index}">
                 <div class="message-timestamp">${timestamp}</div>
-                <div class="customer-name">${customer.profile.name}</div>
+                <div class="customer-name">${customer.profile.name || 'Unknown Customer'}</div>
                 <div class="customer-phone">${customer.profile.phone || 'No phone'}</div>
-                <div class="message-preview">${messagePreview}</div>
+                <div class="message-preview">${escapeHtml(messagePreview)}</div>
             </div>
         `;
     }).join('');
+    
+    // Add event listeners to customer items
+    container.querySelectorAll('.customer-item').forEach((item) => {
+        item.addEventListener('click', function() {
+            const customerId = this.getAttribute('data-customer-id');
+            const index = parseInt(this.getAttribute('data-index'));
+            selectCustomer(customerId, index);
+        });
+    });
 }
 
 function selectCustomer(customerId, index) {
@@ -351,8 +361,11 @@ function selectCustomer(customerId, index) {
         item.classList.remove('selected');
     });
     
-    // Add selection to clicked item
-    event.target.closest('.customer-item').classList.add('selected');
+    // Find and select the clicked item
+    const customerItems = document.querySelectorAll('.customer-item');
+    if (customerItems[index]) {
+        customerItems[index].classList.add('selected');
+    }
     
     selectedCustomer = conversations[index];
     displayConversation(selectedCustomer);
@@ -388,7 +401,7 @@ function displayConversation(customerData) {
     messages.forEach(message => {
         const isInbound = message.direction === 'inbound';
         const bubbleClass = isInbound ? 'message-inbound' : 'message-outbound';
-        const timestamp = formatTimestamp(new Date(message.timestamp));
+        const timestamp = formatTimestamp(message.timestamp);
         
         html += `
             <div class="message-bubble ${bubbleClass}">
@@ -545,16 +558,31 @@ function formatDate(dateString) {
 }
 
 function formatTimestamp(date) {
+    // Handle different date formats
+    let parsedDate;
+    if (date instanceof Date && !isNaN(date)) {
+        parsedDate = date;
+    } else if (typeof date === 'string' || typeof date === 'number') {
+        parsedDate = new Date(date);
+    } else {
+        return 'Invalid Date';
+    }
+    
+    // Check if date is valid
+    if (isNaN(parsedDate.getTime())) {
+        return 'Invalid Date';
+    }
+    
     const now = new Date();
-    const diff = now - date;
+    const diff = now - parsedDate;
     const hours = diff / (1000 * 60 * 60);
     
     if (hours < 24) {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return parsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else if (hours < 48) {
-        return 'Yesterday ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return 'Yesterday ' + parsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else {
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return parsedDate.toLocaleDateString() + ' ' + parsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 }
 

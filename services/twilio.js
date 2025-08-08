@@ -59,6 +59,29 @@ async function sendTestSMS(testPhone, message) {
   try {
     const success = await sendSingleSMS(testPhone, message, 'Test User', 'TEST');
     
+    // Store the test message in Firestore if successful
+    if (success) {
+      try {
+        const { getCustomerIdFromPhone, storeCustomerMessage } = require('./firestore');
+        const customerId = await getCustomerIdFromPhone(testPhone);
+        await storeCustomerMessage({
+          customerId: customerId,
+          channel: 'sms',
+          direction: 'outbound',
+          content: message,
+          channelData: {
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: testPhone,
+            type: 'test'
+          },
+          timestamp: new Date()
+        });
+        console.log(`💾 Stored test message for customer ${customerId}`);
+      } catch (firestoreError) {
+        console.error(`⚠️ Failed to store test message: ${firestoreError.message}`);
+      }
+    }
+    
     return {
       success,
       phone: testPhone,
@@ -82,6 +105,8 @@ async function sendTestSMS(testPhone, message) {
  * Send bulk SMS messages to multiple customers
  */
 async function sendBulkSMS(orders, messageTemplate, testMode = false) {
+  const { getCustomerIdFromPhone, storeCustomerMessage } = require('./firestore');
+  
   const results = {
     success: [],
     errors: [],
@@ -125,6 +150,26 @@ async function sendBulkSMS(orders, messageTemplate, testMode = false) {
         const success = await sendSingleSMS(phone, personalizedMessage, customerName, 'BULK');
         
         if (success) {
+          // Store the sent message in Firestore
+          try {
+            const customerId = await getCustomerIdFromPhone(phone);
+            await storeCustomerMessage({
+              customerId: customerId,
+              channel: 'sms',
+              direction: 'outbound',
+              content: personalizedMessage,
+              channelData: {
+                from: process.env.TWILIO_PHONE_NUMBER,
+                to: phone,
+                type: 'bulk'
+              },
+              timestamp: new Date()
+            });
+            console.log(`💾 Stored bulk message for customer ${customerId}`);
+          } catch (firestoreError) {
+            console.error(`⚠️ Failed to store bulk message: ${firestoreError.message}`);
+          }
+          
           results.success.push({
             phone: phone,
             customerName: customerName,
@@ -141,9 +186,7 @@ async function sendBulkSMS(orders, messageTemplate, testMode = false) {
         }
         
         // Rate limiting - wait 200ms between messages
-        if (!testMode) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
       
     } catch (error) {

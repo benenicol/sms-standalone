@@ -17,9 +17,9 @@
         </header>
 
         <nav class="tabs">
-            <button class="tab active" onclick="showTab('orders', event)">📦 Orders</button>
-            <button class="tab" onclick="showTab('conversations', event)">💬 Conversations</button>
-            <button class="tab" onclick="showTab('test', event)">🧪 Test</button>
+            <button class="tab active" data-tab="orders">📦 Orders</button>
+            <button class="tab" data-tab="conversations">💬 Conversations</button>
+            <button class="tab" data-tab="test">🧪 Test</button>
         </nav>
 
         <!-- Orders Tab -->
@@ -53,7 +53,7 @@
                         <input type="text" id="tag" placeholder="e.g. subscription">
                     </div>
                     
-                    <button onclick="loadOrders()" class="btn btn-primary">🔄 Load Orders</button>
+                    <button id="load-orders-btn" class="btn btn-primary">🔄 Load Orders</button>
                 </div>
 
                 <div class="message-template">
@@ -77,8 +77,8 @@ Thank you for your order of {totalPrice}.</textarea>
                     <div class="selected-count">
                         <span id="selected-count">0</span> orders selected
                     </div>
-                    <button onclick="sendBulkSMS(true)" class="btn btn-secondary">🧪 Test Send</button>
-                    <button onclick="sendBulkSMS(false)" class="btn btn-danger">📤 Send SMS</button>
+                    <button id="bulk-test-btn" class="btn btn-secondary">🧪 Test Send</button>
+                    <button id="bulk-send-btn" class="btn btn-danger">📤 Send SMS</button>
                 </div>
             </div>
         </div>
@@ -88,7 +88,7 @@ Thank you for your order of {totalPrice}.</textarea>
             <div class="conversation-layout">
                 <div class="customer-list">
                     <h3>💬 Customer Conversations</h3>
-                    <button onclick="loadConversations()" class="btn btn-primary btn-small">🔄 Refresh</button>
+                    <button id="load-conversations-btn" class="btn btn-primary btn-small">🔄 Refresh</button>
                     <div id="customer-list" class="customer-items">
                         <div class="loading">Loading conversations...</div>
                     </div>
@@ -111,7 +111,7 @@ Thank you for your order of {totalPrice}.</textarea>
                     
                     <div id="quick-reply" class="quick-reply" style="display: none;">
                         <textarea id="reply-message" placeholder="Type your reply..." rows="3"></textarea>
-                        <button onclick="sendReply()" class="btn btn-primary">📤 Send Reply</button>
+                        <button id="send-reply-btn" class="btn btn-primary">📤 Send Reply</button>
                     </div>
                 </div>
             </div>
@@ -133,7 +133,7 @@ Thank you for your order of {totalPrice}.</textarea>
                     <textarea id="test-message" rows="4" placeholder="This is a test message">Hello! This is a test message from your SMS system. 🚀</textarea>
                 </div>
                 
-                <button onclick="sendTestSMS()" class="btn btn-primary">📤 Send Test SMS</button>
+                <button id="send-test-sms-btn" class="btn btn-primary">📤 Send Test SMS</button>
                 
                 <div id="test-results" class="results"></div>
             </div>
@@ -145,12 +145,12 @@ Thank you for your order of {totalPrice}.</textarea>
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="modal-title">Results</h3>
-                <button onclick="closeModal()" class="close-btn">&times;</button>
+                <button id="close-modal-btn" class="close-btn">&times;</button>
             </div>
             <div id="modal-body" class="modal-body"></div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=3"></script>
 </body>
 </html>
