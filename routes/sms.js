@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getCustomerConversations, sendReplyToCustomer, markConversationAsRead } = require('../services/firestore');
+const { getCustomerConversations, sendReplyToCustomer, markConversationAsRead, fixCustomerProfile } = require('../services/firestore');
 const { sendTestSMS, sendBulkSMS } = require('../services/twilio');
 const { fetchOrdersForSMS } = require('../services/shopify');
 
@@ -105,17 +105,46 @@ router.post('/bulk', async (req, res) => {
   try {
     const { orders, message, testMode = false } = req.body;
     
-    if (!orders || !Array.isArray(orders) || !message) {
+    if (!orders || !Array.isArray(orders)) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Orders array and message are required' 
+        error: 'Orders array is required' 
       });
     }
     
-    const result = await sendBulkSMS(orders, message, testMode);
+    // Support both old format (single message) and new format (individual messages per order)
+    if (!message && !orders.some(order => order.message)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Either a global message or individual order messages are required' 
+      });
+    }
+    
+    const result = await sendBulkSMS(orders, message || '', testMode);
     res.json(result);
   } catch (error) {
     console.error('Error sending bulk SMS:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Fix customer profile with incorrect phone number
+router.post('/fix-customer/:customerId', async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { correctPhone } = req.body;
+    
+    if (!customerId || !correctPhone) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Customer ID and correct phone number are required' 
+      });
+    }
+    
+    const result = await fixCustomerProfile(customerId, correctPhone);
+    res.json({ success: result });
+  } catch (error) {
+    console.error('Error fixing customer profile:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

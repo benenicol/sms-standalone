@@ -34,8 +34,32 @@ if (missingVars.length > 0) {
 }
 console.log('✅ All required environment variables present');
 
-// Middleware
-app.use(helmet());
+// Middleware - Environment-aware Helmet configuration
+const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
+
+if (isVercel) {
+  // Relaxed CSP for Vercel to allow existing onclick handlers
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrcAttr: ["'unsafe-inline'"], // Allow onclick handlers
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    },
+  }));
+} else {
+  // Standard Helmet for local development
+  app.use(helmet());
+}
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

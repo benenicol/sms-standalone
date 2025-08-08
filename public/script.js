@@ -121,6 +121,19 @@ function setupEventListeners() {
         }
     });
     
+    // Filter event listeners
+    const filterIds = ['order-status', 'days', 'tag-filter', 'delivery-filter'];
+    filterIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', function() {
+                if (currentOrders.length > 0) {
+                    loadOrders(); // Reload orders with new filters
+                }
+            });
+        }
+    });
+    
     console.log('✅ Event listeners set up complete');
 }
 
@@ -206,7 +219,7 @@ window.loadOrders = async function loadOrders() {
         if (data.success) {
             let orders = data.orders;
             
-            // Apply delivery method filter
+            // Apply additional client-side filters
             if (deliveryFilter !== 'all') {
                 orders = orders.filter(order => {
                     const deliveryMethod = determineDeliveryMethod(order);
@@ -219,9 +232,20 @@ window.loadOrders = async function loadOrders() {
                 });
             }
             
+            // Apply tag filter if specified
+            if (tag) {
+                const filterTags = tag.toLowerCase().split(',').map(t => t.trim());
+                orders = orders.filter(order => {
+                    const orderTags = (order.tags || []).map(t => t.toLowerCase().trim());
+                    return filterTags.some(filterTag => 
+                        orderTags.some(orderTag => orderTag.includes(filterTag))
+                    );
+                });
+            }
+            
             currentOrders = orders;
             displayOrders(currentOrders);
-            updateStatus('connected', `${currentOrders.length} orders loaded`);
+            updateStatus('connected', `${currentOrders.length} orders loaded (${data.orders.length} total)`);
             
             // Show bulk actions if orders are available
             const bulkActions = document.getElementById('bulk-actions');
@@ -904,23 +928,54 @@ function parseTagTemplates() {
 }
 
 function determineDeliveryMethod(order) {
-    // Check shipping method title
-    if (order.shipping_lines && order.shipping_lines.length > 0) {
-        const shippingTitle = order.shipping_lines[0].title.toLowerCase();
-        if (shippingTitle.includes('pickup') || shippingTitle.includes('collection')) {
+    console.log('Determining delivery method for order:', {
+        orderNumber: order.orderNumber || order.name,
+        deliveryMethod: order.deliveryMethod,
+        shipping_lines: order.shipping_lines,
+        has_shipping_address: !!order.shipping_address,
+        shipping_address: order.shipping_address
+    });
+    
+    // First check if we have a deliveryMethod from Shopify service
+    if (order.deliveryMethod) {
+        const method = order.deliveryMethod.toLowerCase();
+        if (method.includes('pickup') || method.includes('collection')) {
             return 'Pickup';
         }
-        if (shippingTitle.includes('delivery') || shippingTitle.includes('shipping')) {
+        if (method.includes('delivery') || method.includes('shipping') || method.includes('home')) {
             return 'Home Delivery';
         }
     }
     
-    // Check if there's a shipping address
-    if (order.shipping_address) {
+    // Check shipping method title
+    if (order.shipping_lines && order.shipping_lines.length > 0) {
+        const shippingTitle = order.shipping_lines[0].title.toLowerCase();
+        console.log('Checking shipping title:', shippingTitle);
+        
+        if (shippingTitle.includes('pickup') || shippingTitle.includes('collection')) {
+            return 'Pickup';
+        }
+        if (shippingTitle.includes('delivery') || shippingTitle.includes('shipping') || shippingTitle.includes('home')) {
+            return 'Home Delivery';
+        }
+    }
+    
+    // Check if there's a shipping address (more detailed check)
+    if (order.shipping_address && 
+        (order.shipping_address.address1 || order.shipping_address.city)) {
+        console.log('Has shipping address, marking as Home Delivery');
+        return 'Home Delivery';
+    }
+    
+    // Check billing address as fallback for home delivery
+    if (order.billing_address && order.billing_address.address1 && 
+        !order.shipping_address) {
+        console.log('No shipping address but has billing address, checking if same customer');
         return 'Home Delivery';
     }
     
     // Default fallback
+    console.log('Defaulting to Pickup');
     return 'Pickup';
 }
 
@@ -953,7 +1008,7 @@ function getMessageTemplate(deliveryMethod, tags, order) {
 }
 
 function personalizeMessage(template, order) {
-    const customerName = order.customer?.name || order.customer?.first_name || 'there';
+    const customerName = order.customer?.first_name || order.customer?.name?.split(' ')[0] || 'there';
     const orderNumber = order.orderNumber || order.name || order.order_number;
     const deliveryMethod = determineDeliveryMethod(order);
     const totalPrice = order.totalPrice || order.total_price || '';

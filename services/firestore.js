@@ -86,10 +86,48 @@ async function getCustomerIdFromPhone(phoneNumber) {
 }
 
 /**
+ * Fix existing customer record with incorrect phone number
+ */
+async function fixCustomerProfile(customerId, correctPhone) {
+  try {
+    const customerDocRef = db.collection(CUSTOMER_COMMUNICATIONS_COLLECTION).doc(customerId);
+    const customerDoc = await customerDocRef.get();
+    
+    if (customerDoc.exists) {
+      const customerData = customerDoc.data();
+      const oldPhone = customerData.profile.phone;
+      
+      await customerDocRef.update({
+        'profile.phone': correctPhone,
+        'profile.name': `Customer ${correctPhone.slice(-4)}`,
+        'profile.updatedAt': new Date().toISOString()
+      });
+      
+      console.log(`✅ Fixed customer ${customerId}: ${oldPhone} → ${correctPhone}`);
+      return true;
+    } else {
+      console.log(`❌ Customer ${customerId} not found`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`Error fixing customer profile: ${error.message}`);
+    return false;
+  }
+}
+
+/**
  * Store a customer message in Firestore
  */
 async function storeCustomerMessage(messageData) {
   try {
+    console.log('🔍 Storing message with data:', {
+      customerId: messageData.customerId,
+      direction: messageData.direction,
+      from: messageData.channelData?.from,
+      to: messageData.channelData?.to,
+      channelData: messageData.channelData
+    });
+    
     const customerDocRef = db.collection(CUSTOMER_COMMUNICATIONS_COLLECTION).doc(messageData.customerId);
     
     // Get existing customer document
@@ -102,7 +140,10 @@ async function storeCustomerMessage(messageData) {
       
       // If customer doesn't have Shopify data, try to enrich it
       if (!customerData.profile.shopifyId) {
-        const shopifyCustomer = await getShopifyCustomerData(messageData.channelData.from);
+        // For outbound messages, the customer's phone is in 'to', for inbound it's in 'from'
+        const customerPhone = messageData.direction === 'outbound' ? 
+          messageData.channelData.to : messageData.channelData.from;
+        const shopifyCustomer = await getShopifyCustomerData(customerPhone);
         if (shopifyCustomer) {
           const fullName = `${shopifyCustomer.first_name || ''} ${shopifyCustomer.last_name || ''}`.trim();
           customerData.profile.name = fullName || customerData.profile.name;
@@ -114,15 +155,21 @@ async function storeCustomerMessage(messageData) {
       }
     } else {
       // Create new customer - try to get Shopify data first
-      const shopifyCustomer = await getShopifyCustomerData(messageData.channelData.from);
+      // For outbound messages, the customer's phone is in 'to', for inbound it's in 'from'
+      const customerPhone = messageData.direction === 'outbound' ? 
+        messageData.channelData.to : messageData.channelData.from;
+      
+      console.log(`🔍 Customer phone determined as: ${customerPhone} (direction: ${messageData.direction})`);
+      const shopifyCustomer = await getShopifyCustomerData(customerPhone);
       
       if (shopifyCustomer) {
         // Use Shopify customer data
         const fullName = `${shopifyCustomer.first_name || ''} ${shopifyCustomer.last_name || ''}`.trim();
+        console.log(`🔍 Creating Shopify customer profile with phone: ${customerPhone}`);
         customerData = {
           profile: {
-            name: fullName || `Customer ${messageData.channelData.from.slice(-4)}`,
-            phone: messageData.channelData.from,
+            name: fullName || `Customer ${customerPhone.slice(-4)}`,
+            phone: customerPhone,
             email: shopifyCustomer.email || null,
             shopifyId: shopifyCustomer.id.toString(),
             createdAt: new Date().toISOString(),
@@ -133,10 +180,11 @@ async function storeCustomerMessage(messageData) {
         console.log(`Created new customer with Shopify data: ${fullName} (ID: ${shopifyCustomer.id})`);
       } else {
         // Fallback to basic customer
+        console.log(`🔍 Creating basic customer profile with phone: ${customerPhone}`);
         customerData = {
           profile: {
-            name: `Customer ${messageData.channelData.from.slice(-4)}`,
-            phone: messageData.channelData.from,
+            name: `Customer ${customerPhone.slice(-4)}`,
+            phone: customerPhone,
             email: null,
             shopifyId: null,
             createdAt: new Date().toISOString(),
@@ -404,5 +452,6 @@ module.exports = {
   storeCustomerMessage,
   getCustomerConversations,
   sendReplyToCustomer,
-  markConversationAsRead
+  markConversationAsRead,
+  fixCustomerProfile
 };

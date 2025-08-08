@@ -11,6 +11,27 @@
   ],
   "routes": [
     {
+      "src": "/styles.css",
+      "dest": "/public/styles.css",
+      "headers": {
+        "Content-Type": "text/css"
+      }
+    },
+    {
+      "src": "/script.js",
+      "dest": "/public/script.js",
+      "headers": {
+        "Content-Type": "application/javascript"
+      }
+    },
+    {
+      "src": "/(.+\\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot))",
+      "dest": "/public/$1",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
       "src": "/sms",
       "methods": ["POST"],
       "headers": {

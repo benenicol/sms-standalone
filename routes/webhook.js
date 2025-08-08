@@ -13,6 +13,7 @@ router.post('/sms', async (req, res) => {
     const { From, To, Body, MessageSid } = req.body;
     
     console.log(`📱 SMS from ${From} to ${To}: ${Body}`);
+    console.log('🔍 Webhook parameters:', { From, To, Body, MessageSid });
     
     // Validate required parameters
     if (!From || !To || !Body || !MessageSid) {
@@ -23,6 +24,7 @@ router.post('/sms', async (req, res) => {
     }
     
     // Get customer ID and store message
+    console.log(`🔍 Looking up customer for phone: ${From}`);
     const customerId = await getCustomerIdFromPhone(From);
     console.log(`👤 Customer ID: ${customerId}`);
     
