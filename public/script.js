@@ -1006,7 +1006,7 @@ function getMessageTemplate(deliveryMethod, tags, order) {
             return pickupReadyTemplate ? pickupReadyTemplate.value : 'Hi {customerName}, your order is ready for pickup!';
         }
         const pickupDefaultTemplate = document.getElementById('pickup-default');
-        return pickupDefaultTemplate ? pickupDefaultTemplate.value : 'Hi {customerName}, your order will be ready soon for pickup!';
+        return pickupDefaultTemplate ? pickupDefaultTemplate.value : 'Hi {customerName}, your order is packed and ready to go for pickup at the Markets on Sunday, See you there.';
     } else {
         const deliveryDefaultTemplate = document.getElementById('home-delivery-default');
         return deliveryDefaultTemplate ? deliveryDefaultTemplate.value : 'Hi {customerName}, thanks for your order! We\'ll be in touch with delivery details.';

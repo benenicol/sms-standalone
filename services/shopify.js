@@ -140,6 +140,16 @@ async function fetchOrdersForSMS({ status = 'fulfilled', limit = 50, days = 7, t
           'Pending';
       }
       
+      // Create a readable order description from line items
+      const orderDescription = order.line_items && order.line_items.length > 0
+        ? order.line_items.map(item => {
+            if (item.quantity > 1) {
+              return `${item.quantity} x ${item.name}`;
+            }
+            return item.name;
+          }).join(', ')
+        : 'order';
+
       return {
         id: order.id,
         orderNumber: order.order_number || order.name,
@@ -155,6 +165,7 @@ async function fetchOrdersForSMS({ status = 'fulfilled', limit = 50, days = 7, t
         tags: order.tags ? order.tags.split(',').map(tag => tag.trim()) : [],
         createdAt: order.created_at,
         totalPrice: order.total_price,
+        subscriptionItems: orderDescription,
         lineItems: order.line_items?.map(item => ({
           name: item.name,
           quantity: item.quantity,
