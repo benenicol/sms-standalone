@@ -11,6 +11,14 @@
   ],
   "routes": [
     {
+      "src": "/sms",
+      "methods": ["POST"],
+      "headers": {
+        "x-vercel-protection-bypass": "1"
+      },
+      "dest": "server.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "server.js"
     }
