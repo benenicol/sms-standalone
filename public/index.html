@@ -25,9 +25,44 @@
         <!-- Orders Tab -->
         <div id="orders-tab" class="tab-content active">
             <div class="section">
-                <h2>📦 Order Notifications</h2>
+                <h2>📱 SMS Templates</h2>
                 
-                <div class="filters">
+                <div class="template-section">
+                    <h3>🚚 Home Delivery Templates</h3>
+                    <div class="form-group">
+                        <label for="home-delivery-default">Default Home Delivery:</label>
+                        <textarea id="home-delivery-default" rows="3">Hi {customerName}, thanks for your {orderItems} order! We'll be in touch with delivery details.</textarea>
+                        <div class="char-counter" id="home-delivery-default-counter">0 chars</div>
+                    </div>
+                </div>
+                
+                <div class="template-section">
+                    <h3>📦 Pickup Templates</h3>
+                    <div class="form-group">
+                        <label for="pickup-default">Default Pickup:</label>
+                        <textarea id="pickup-default" rows="3">Hi {customerName}, your {orderItems} order will be ready tomorrow. We'll send you pickup details shortly.</textarea>
+                        <div class="char-counter" id="pickup-default-counter">0 chars</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="pickup-ready">Ready for Pickup:</label>
+                        <textarea id="pickup-ready" rows="3">Hi {customerName}, your {orderItems} order is ready for pickup at our location. Please bring your order confirmation.</textarea>
+                        <div class="char-counter" id="pickup-ready-counter">0 chars</div>
+                    </div>
+                </div>
+                
+                <div class="template-section">
+                    <h3>🏷️ Tag-Specific Templates</h3>
+                    <div class="form-group">
+                        <label for="tag-templates">Tag Templates (one per line: tagname=message):</label>
+                        <textarea id="tag-templates" rows="6">urgent=Hi {customerName}, your urgent {orderItems} order is being prioritized and will be processed today!
+ready=Hi {customerName}, your {orderItems} order is ready! 
+delivery_today=Hi {customerName}, your {orderItems} order will be delivered today between 10am-4pm.
+first_order=Hi {customerName}, welcome! Your first {orderItems} order is being prepared. We're excited to have you on board!</textarea>
+                        <div class="char-counter" id="tag-templates-counter">0 chars</div>
+                    </div>
+                </div>
+                
+                <div class="order-filters">
                     <div class="filter-group">
                         <label for="order-status">Order Status:</label>
                         <select id="order-status">
@@ -49,24 +84,23 @@
                     </div>
                     
                     <div class="filter-group">
-                        <label for="tag">Filter by Tag:</label>
-                        <input type="text" id="tag" placeholder="e.g. subscription">
+                        <label for="tag-filter">Filter by Tag:</label>
+                        <input type="text" id="tag-filter" placeholder="e.g. urgent, ready">
                     </div>
                     
-                    <button id="load-orders-btn" class="btn btn-primary">🔄 Load Orders</button>
-                </div>
-
-                <div class="message-template">
-                    <h3>📝 Message Template</h3>
-                    <textarea id="message-template" rows="4" placeholder="Hi {customerName}, your order #{orderNumber} is ready! Delivery method: {deliveryMethod}">Hi {customerName}, your order #{orderNumber} is ready for {deliveryMethod}! 🎉
-
-Thank you for your order of {totalPrice}.</textarea>
-                    <div class="template-help">
-                        <p>Available placeholders: <code>{customerName}</code>, <code>{orderNumber}</code>, <code>{deliveryMethod}</code>, <code>{totalPrice}</code></p>
-                        <div class="char-counter">
-                            <span id="char-count">0</span>/160 characters
-                        </div>
+                    <div class="filter-group">
+                        <label for="delivery-filter">Delivery Method:</label>
+                        <select id="delivery-filter">
+                            <option value="all">All Methods</option>
+                            <option value="pickup">Pickup Only</option>
+                            <option value="delivery">Home Delivery Only</option>
+                        </select>
                     </div>
+                </div>
+                
+                <div class="order-actions">
+                    <button id="load-orders-btn" class="btn btn-primary">📦 Load Orders</button>
+                    <button id="update-previews-btn" class="btn btn-secondary">🔄 Update Message Previews</button>
                 </div>
 
                 <div id="orders-list" class="orders-container">
@@ -77,6 +111,8 @@ Thank you for your order of {totalPrice}.</textarea>
                     <div class="selected-count">
                         <span id="selected-count">0</span> orders selected
                     </div>
+                    <button id="select-all-btn" class="btn btn-secondary">Select All</button>
+                    <button id="select-none-btn" class="btn btn-secondary">Select None</button>
                     <button id="bulk-test-btn" class="btn btn-secondary">🧪 Test Send</button>
                     <button id="bulk-send-btn" class="btn btn-danger">📤 Send SMS</button>
                 </div>
@@ -151,6 +187,6 @@ Thank you for your order of {totalPrice}.</textarea>
         </div>
     </div>
 
-    <script src="script.js?v=4"></script>
+    <script src="script.js?v=6"></script>
 </body>
 </html>

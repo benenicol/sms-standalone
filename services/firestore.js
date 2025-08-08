@@ -226,7 +226,6 @@ function processConversationsTimestamps(conversations) {
 async function getCustomerConversations(limit = 50) {
   try {
     const snapshot = await db.collection(CUSTOMER_COMMUNICATIONS_COLLECTION)
-      .orderBy('profile.lastActivity', 'desc')
       .limit(limit)
       .get();
     
@@ -243,12 +242,12 @@ async function getCustomerConversations(limit = 50) {
       const latestMessage = processedConversations.length > 0 ? 
         processedConversations[processedConversations.length - 1] : null;
       
-      // Convert profile timestamps
+      // Convert profile timestamps and set lastActivity if missing
       const profile = {
         ...data.profile,
         createdAt: convertFirestoreTimestamp(data.profile?.createdAt),
         updatedAt: convertFirestoreTimestamp(data.profile?.updatedAt),
-        lastActivity: convertFirestoreTimestamp(data.profile?.lastActivity)
+        lastActivity: convertFirestoreTimestamp(data.profile?.lastActivity) || (latestMessage ? latestMessage.timestamp : null)
       };
       
       customers.push({

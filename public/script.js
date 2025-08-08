@@ -73,6 +73,24 @@ function setupEventListeners() {
         closeModalBtn.addEventListener('click', closeModal);
     }
     
+    // Update Previews button
+    const updatePreviewsBtn = document.getElementById('update-previews-btn');
+    if (updatePreviewsBtn) {
+        updatePreviewsBtn.addEventListener('click', updateMessagePreviews);
+    }
+    
+    // Select All button
+    const selectAllBtn = document.getElementById('select-all-btn');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', selectAllOrders);
+    }
+    
+    // Select None button  
+    const selectNoneBtn = document.getElementById('select-none-btn');
+    if (selectNoneBtn) {
+        selectNoneBtn.addEventListener('click', selectNoneOrders);
+    }
+    
     // Message template character counter
     const messageTemplate = document.getElementById('message-template');
     if (messageTemplate) {
@@ -89,6 +107,19 @@ function setupEventListeners() {
             }
         });
     }
+    
+    // Template character counting
+    const templateIds = ['home-delivery-default', 'pickup-default', 'pickup-ready', 'tag-templates'];
+    templateIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('input', function() {
+                updateCharCount(id);
+            });
+            // Initialize character count
+            updateCharCount(id);
+        }
+    });
     
     console.log('✅ Event listeners set up complete');
 }
@@ -189,28 +220,88 @@ function displayOrders(orders) {
         return;
     }
     
-    container.innerHTML = orders.map((order, index) => `
-        <div class="order-item" data-index="${index}">
-            <input type="checkbox" class="order-checkbox" data-index="${index}">
-            <div class="order-info">
-                <div>
-                    <div class="customer-name">${order.customer.name}</div>
-                    <div class="customer-phone">${order.customer.phone || 'No phone'}</div>
-                </div>
-                <div>
-                    <div class="delivery-method">${order.deliveryMethod}</div>
-                    <div class="order-number">Order #${order.orderNumber}</div>
-                </div>
-                <div>
-                    <div>${order.totalPrice ? '$' + order.totalPrice : ''}</div>
-                    <div class="order-number">${formatDate(order.createdAt)}</div>
-                </div>
-                <div>
-                    ${order.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
-                </div>
-            </div>
-        </div>
-    `).join('');
+    // Sort orders by delivery method first, then by tags
+    const sortedOrders = [...orders].sort((a, b) => {
+        const aDelivery = determineDeliveryMethod(a);
+        const bDelivery = determineDeliveryMethod(b);
+        const aTags = (a.tags || []).join(',').toLowerCase();
+        const bTags = (b.tags || []).join(',').toLowerCase();
+        
+        // Pickup orders first, then delivery
+        if (aDelivery === 'Pickup' && bDelivery === 'Home Delivery') return -1;
+        if (aDelivery === 'Home Delivery' && bDelivery === 'Pickup') return 1;
+        
+        // Then sort by tag priority (urgent > ready > others)
+        const urgentPriority = (tags) => {
+            if (tags.includes('urgent')) return 0;
+            if (tags.includes('ready')) return 1;
+            if (tags.includes('first_order')) return 2;
+            return 3;
+        };
+        
+        const aPriority = urgentPriority(aTags);
+        const bPriority = urgentPriority(bTags);
+        
+        return aPriority - bPriority;
+    });
+    
+    let html = `
+        <table class="orders-table">
+            <thead>
+                <tr>
+                    <th class="checkbox-column">Send</th>
+                    <th>Customer</th>
+                    <th>Order #</th>
+                    <th>Delivery Method</th>
+                    <th>Tags</th>
+                    <th>Message Preview</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    sortedOrders.forEach((order, index) => {
+        const customerName = order.customer?.name || 
+            `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() ||
+            'Unknown Customer';
+        
+        const phone = order.customer?.phone || order.billing_address?.phone || order.shipping_address?.phone || '';
+        const hasPhone = !!phone;
+        const deliveryMethod = determineDeliveryMethod(order);
+        const tags = order.tags || [];
+        const orderNumber = order.orderNumber || order.name || order.order_number || 'N/A';
+        
+        // Get personalized message template
+        const messageTemplate = getMessageTemplate(deliveryMethod, tags, order);
+        const personalizedMessage = personalizeMessage(messageTemplate, order);
+        
+        html += `
+            <tr class="order-row ${!hasPhone ? 'order-disabled' : ''}">
+                <td class="checkbox-column">
+                    <input type="checkbox" class="order-checkbox" data-index="${index}" 
+                           ${!hasPhone ? 'disabled' : ''}>
+                </td>
+                <td>
+                    <div class="customer-name">${customerName}</div>
+                    <div class="customer-phone ${!hasPhone ? 'no-phone' : ''}">${phone || 'No phone number'}</div>
+                </td>
+                <td class="order-number">#${orderNumber}</td>
+                <td class="delivery-method">
+                    <span class="delivery-badge ${deliveryMethod.toLowerCase().replace(' ', '-')}">${deliveryMethod}</span>
+                </td>
+                <td class="order-tags">
+                    ${tags.map(tag => `<span class="tag-badge">${tag.trim()}</span>`).join('')}
+                </td>
+                <td class="message-column">
+                    <textarea class="message-box" id="message-${index}" data-index="${index}">${personalizedMessage}</textarea>
+                    <div class="char-counter" id="message-${index}-counter">0 chars</div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
     
     // Add event listeners to checkboxes
     container.querySelectorAll('.order-checkbox').forEach((checkbox) => {
@@ -219,6 +310,21 @@ function displayOrders(orders) {
             toggleOrderSelection(index);
         });
     });
+    
+    // Add event listeners to message boxes for character counting
+    container.querySelectorAll('.message-box').forEach((messageBox) => {
+        messageBox.addEventListener('input', function() {
+            const index = this.getAttribute('data-index');
+            updateCharCount(`message-${index}`);
+        });
+        
+        // Initialize character count
+        const index = messageBox.getAttribute('data-index');
+        updateCharCount(`message-${index}`);
+    });
+    
+    // Update current orders reference to sorted orders
+    currentOrders = sortedOrders;
 }
 
 function toggleOrderSelection(index) {
@@ -713,3 +819,171 @@ document.getElementById('results-modal').addEventListener('click', function(e) {
         closeModal();
     }
 });
+
+// Template Management Functions
+function parseTagTemplates() {
+    const tagTemplatesText = document.getElementById('tag-templates').value;
+    const templates = {};
+    
+    tagTemplatesText.split('\n').forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed && trimmed.includes('=')) {
+            const [tag, message] = trimmed.split('=', 2);
+            templates[tag.trim().toLowerCase()] = message.trim();
+        }
+    });
+    
+    return templates;
+}
+
+function determineDeliveryMethod(order) {
+    // Check shipping method title
+    if (order.shipping_lines && order.shipping_lines.length > 0) {
+        const shippingTitle = order.shipping_lines[0].title.toLowerCase();
+        if (shippingTitle.includes('pickup') || shippingTitle.includes('collection')) {
+            return 'Pickup';
+        }
+        if (shippingTitle.includes('delivery') || shippingTitle.includes('shipping')) {
+            return 'Home Delivery';
+        }
+    }
+    
+    // Check if there's a shipping address
+    if (order.shipping_address) {
+        return 'Home Delivery';
+    }
+    
+    // Default fallback
+    return 'Pickup';
+}
+
+function getMessageTemplate(deliveryMethod, tags, order) {
+    const tagTemplates = parseTagTemplates();
+    
+    // Check for tag-specific templates first
+    for (const tag of tags) {
+        const lowerTag = tag.toLowerCase();
+        if (tagTemplates[lowerTag]) {
+            return tagTemplates[lowerTag];
+        }
+    }
+    
+    // Fall back to delivery method templates
+    const isPickup = deliveryMethod === 'Pickup';
+    const hasReadyTag = tags.some(tag => tag.toLowerCase().includes('ready') || tag.toLowerCase().includes('completed'));
+    
+    if (isPickup) {
+        if (hasReadyTag) {
+            const pickupReadyTemplate = document.getElementById('pickup-ready');
+            return pickupReadyTemplate ? pickupReadyTemplate.value : 'Hi {customerName}, your order is ready for pickup!';
+        }
+        const pickupDefaultTemplate = document.getElementById('pickup-default');
+        return pickupDefaultTemplate ? pickupDefaultTemplate.value : 'Hi {customerName}, your order will be ready soon for pickup!';
+    } else {
+        const deliveryDefaultTemplate = document.getElementById('home-delivery-default');
+        return deliveryDefaultTemplate ? deliveryDefaultTemplate.value : 'Hi {customerName}, thanks for your order! We\'ll be in touch with delivery details.';
+    }
+}
+
+function personalizeMessage(template, order) {
+    const customerName = order.customer?.name || order.customer?.first_name || 'there';
+    const orderNumber = order.orderNumber || order.name || order.order_number;
+    const deliveryMethod = determineDeliveryMethod(order);
+    const totalPrice = order.totalPrice || order.total_price || '';
+    const orderItems = order.subscriptionItems || 'order';
+    
+    return template
+        .replace(/\{customerName\}/g, customerName)
+        .replace(/\{orderNumber\}/g, orderNumber)
+        .replace(/\{deliveryMethod\}/g, deliveryMethod)
+        .replace(/\{totalPrice\}/g, totalPrice)
+        .replace(/\{orderItems\}/g, orderItems);
+}
+
+function updateMessagePreviews() {
+    if (currentOrders.length === 0) {
+        showError('Please load orders first');
+        return;
+    }
+    
+    const container = document.getElementById('orders-list');
+    const messageBoxes = container.querySelectorAll('.message-box');
+    
+    messageBoxes.forEach((messageBox, index) => {
+        if (currentOrders[index]) {
+            const order = currentOrders[index];
+            const deliveryMethod = determineDeliveryMethod(order);
+            const tags = order.tags || [];
+            const messageTemplate = getMessageTemplate(deliveryMethod, tags, order);
+            const personalizedMessage = personalizeMessage(messageTemplate, order);
+            
+            messageBox.value = personalizedMessage;
+            updateCharCount(`message-${index}`);
+        }
+    });
+    
+    updateStatus('connected', 'Message previews updated');
+}
+
+function selectAllOrders() {
+    const checkboxes = document.querySelectorAll('.order-checkbox:not(:disabled)');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+        const index = parseInt(checkbox.getAttribute('data-index'));
+        if (index >= 0 && !selectedOrders.find(order => order.id === currentOrders[index].id)) {
+            selectedOrders.push(currentOrders[index]);
+        }
+    });
+    updateBulkActions();
+}
+
+function selectNoneOrders() {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    selectedOrders = [];
+    updateBulkActions();
+}
+
+function updateCharCount(textareaId) {
+    const textarea = document.getElementById(textareaId);
+    const counter = document.getElementById(textareaId + '-counter');
+    
+    if (!textarea || !counter) return;
+    
+    const text = textarea.value;
+    const length = text.length;
+    
+    // Calculate SMS segments
+    let segments = 1;
+    let maxChars = 160;
+    
+    // Check if text contains non-GSM characters (emojis, unicode)
+    const hasUnicode = /[^\x00-\x7F]/.test(text);
+    if (hasUnicode) {
+        maxChars = 70;
+    }
+    
+    if (length > maxChars) {
+        segments = Math.ceil(length / (maxChars - 7)); // -7 for concatenation header
+    }
+    
+    // Update counter text
+    let counterText = `${length} chars`;
+    if (segments > 1) {
+        counterText += ` (${segments} SMS)`;
+    }
+    
+    counter.textContent = counterText;
+    
+    // Update color based on length
+    counter.className = 'char-counter';
+    if (length <= 140) {
+        // Safe range - green
+    } else if (length <= 160) {
+        counter.classList.add('warning');
+    } else {
+        counter.classList.add('danger');
+    }
+}
