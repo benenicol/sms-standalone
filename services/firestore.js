@@ -1,18 +1,33 @@
 const admin = require('firebase-admin');
 const { getShopifyCustomerData } = require('./shopify');
 
-// Initialize Firebase Admin
+// Initialize Firebase Admin with error handling
 if (!admin.apps.length) {
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is required');
+  try {
+    console.log('🔥 Initializing Firebase Admin...');
+    
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is required');
+    }
+    
+    if (!process.env.FIRESTORE_PROJECT_ID) {
+      throw new Error('FIRESTORE_PROJECT_ID environment variable is required');
+    }
+    
+    console.log('📋 Parsing Firebase service account...');
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    
+    console.log('🔧 Creating Firebase app...');
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      projectId: process.env.FIRESTORE_PROJECT_ID
+    });
+    
+    console.log('✅ Firebase Admin initialized successfully');
+  } catch (error) {
+    console.error('❌ Firebase initialization error:', error.message);
+    throw error;
   }
-  
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: process.env.FIRESTORE_PROJECT_ID
-  });
 }
 
 const db = admin.firestore();

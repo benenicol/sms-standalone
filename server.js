@@ -1,4 +1,12 @@
+// Load environment variables
 require('dotenv').config();
+
+// Log startup info
+console.log('🚀 Starting SMS Webhook Server...');
+console.log('📊 Node Version:', process.version);
+console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
+console.log('📡 Port:', process.env.PORT || 3000);
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -6,6 +14,25 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Add startup validation
+console.log('🔧 Validating environment variables...');
+const requiredEnvVars = [
+  'FIRESTORE_PROJECT_ID',
+  'FIREBASE_SERVICE_ACCOUNT', 
+  'SHOPIFY_SHOP',
+  'SHOPIFY_ACCESS_TOKEN',
+  'TWILIO_ACCOUNT_SID',
+  'TWILIO_AUTH_TOKEN',
+  'TWILIO_PHONE_NUMBER'
+];
+
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingVars.length > 0) {
+  console.error('❌ Missing required environment variables:', missingVars);
+  process.exit(1);
+}
+console.log('✅ All required environment variables present');
 
 // Middleware
 app.use(helmet());
@@ -16,9 +43,21 @@ app.use(express.urlencoded({ extended: true }));
 // Static files
 app.use(express.static('public'));
 
-// Import routes
-const webhookRoutes = require('./routes/webhook');
-const smsRoutes = require('./routes/sms');
+// Import routes with error handling
+let webhookRoutes, smsRoutes;
+try {
+  console.log('📦 Loading webhook routes...');
+  webhookRoutes = require('./routes/webhook');
+  console.log('✅ Webhook routes loaded');
+  
+  console.log('📦 Loading SMS routes...');
+  smsRoutes = require('./routes/sms');
+  console.log('✅ SMS routes loaded');
+} catch (error) {
+  console.error('❌ Error loading routes:', error.message);
+  console.error('Stack:', error.stack);
+  process.exit(1);
+}
 
 // Routes
 app.use('/webhook', webhookRoutes);
@@ -29,9 +68,37 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Health check
+// Health check with environment validation
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    nodeVersion: process.version,
+    port: PORT,
+    env_check: {
+      firebase: !!process.env.FIREBASE_SERVICE_ACCOUNT,
+      shopify: !!process.env.SHOPIFY_SHOP,
+      twilio: !!process.env.TWILIO_ACCOUNT_SID
+    }
+  };
+  
+  console.log('🔍 Health check requested:', health);
+  res.json(health);
+});
+
+// Deployment status endpoint
+app.get('/deployment-status', (req, res) => {
+  res.json({
+    status: 'deployed',
+    timestamp: new Date().toISOString(),
+    message: 'SMS Webhook server is running successfully',
+    endpoints: {
+      webhook: '/webhook/sms',
+      conversations: '/api/sms/conversations',
+      health: '/health'
+    }
+  });
 });
 
 // 404 handler
