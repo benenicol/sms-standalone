@@ -1,7 +1,7 @@
 {
   "name": "sms-webhook-standalone",
   "version": "1.0.0",
-  "description": "SMS webhook handler for Twilio with Shopify integration",
+  "description": "SMS webhook handler for Twilio with Shopify integration - Production Ready",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
