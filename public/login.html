@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMS Manager Login</title>
+    <title>SMS Manager Login - Allynview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -12,8 +15,8 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Assistant', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #ffffff;
             height: 100vh;
             display: flex;
             align-items: center;
@@ -23,8 +26,9 @@
         .login-container {
             background: white;
             padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            box-shadow: 0 4px 20px rgba(18, 18, 18, 0.1);
+            border: 1px solid #e5e5e5;
             width: 100%;
             max-width: 400px;
         }
@@ -34,14 +38,21 @@
             margin-bottom: 2rem;
         }
 
+        .logo {
+            max-width: 200px;
+            height: auto;
+            margin-bottom: 1rem;
+        }
+
         .login-header h1 {
-            color: #2d3748;
+            color: #121212;
             font-size: 1.8rem;
+            font-weight: 700;
             margin-bottom: 0.5rem;
         }
 
         .login-header p {
-            color: #718096;
+            color: #666;
             font-size: 0.9rem;
         }
 
@@ -52,43 +63,45 @@
         .form-group label {
             display: block;
             margin-bottom: 0.5rem;
-            font-weight: 500;
-            color: #4a5568;
+            font-weight: 700;
+            color: #121212;
         }
 
         .form-group input {
             width: 100%;
             padding: 0.75rem;
-            border: 2px solid #e2e8f0;
-            border-radius: 6px;
+            border: 1px solid #ddd;
+            border-radius: 2px;
             font-size: 1rem;
+            font-family: 'Assistant', sans-serif;
             transition: border-color 0.2s;
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: #3b82f6;
+            border-color: #595f33;
         }
 
         .login-btn {
             width: 100%;
             padding: 0.75rem;
-            background-color: #3b82f6;
-            color: white;
+            background-color: #595f33;
+            color: #ffffff;
             border: none;
-            border-radius: 6px;
+            border-radius: 2px;
             font-size: 1rem;
-            font-weight: 500;
+            font-weight: 700;
+            font-family: 'Assistant', sans-serif;
             cursor: pointer;
             transition: background-color 0.2s;
         }
 
         .login-btn:hover {
-            background-color: #2563eb;
+            background-color: #4a5029;
         }
 
         .login-btn:disabled {
-            background-color: #cbd5e1;
+            background-color: #ccc;
             cursor: not-allowed;
         }
 
@@ -123,7 +136,8 @@
 <body>
     <div class="login-container">
         <div class="login-header">
-            <h1>📱 SMS Manager</h1>
+            <img src="https://allynview.com.au/nrty2D01Crop.png" alt="Allynview Logo" class="logo">
+            <h1>SMS Manager</h1>
             <p>Please sign in to continue</p>
         </div>
 
@@ -182,10 +196,10 @@
                     successDiv.textContent = 'Login successful! Redirecting...';
                     successDiv.style.display = 'block';
                     
-                    // Redirect to main app
+                    // Redirect to main app - use window.location.replace for better session handling
                     setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1000);
+                        window.location.replace('/');
+                    }, 1500);
                 } else {
                     errorDiv.textContent = result.message || 'Invalid email or password';
                     errorDiv.style.display = 'block';
