@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getCustomerConversations, sendReplyToCustomer } = require('../services/firestore');
+const { getCustomerConversations, sendReplyToCustomer, markConversationAsRead } = require('../services/firestore');
 const { sendTestSMS, sendBulkSMS } = require('../services/twilio');
 const { fetchOrdersForSMS } = require('../services/shopify');
 
@@ -32,6 +32,26 @@ router.post('/reply', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error sending reply:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Mark conversation as read
+router.post('/mark-read/:customerId', async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    
+    if (!customerId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Customer ID is required' 
+      });
+    }
+    
+    const result = await markConversationAsRead(customerId);
+    res.json(result);
+  } catch (error) {
+    console.error('Error marking conversation as read:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

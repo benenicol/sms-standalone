@@ -156,12 +156,22 @@ async function storeCustomerMessage(messageData) {
       direction: messageData.direction,
       content: messageData.content,
       channelData: messageData.channelData,
-      status: 'received'
+      status: 'received',
+      isRead: messageData.direction === 'outbound', // Outbound messages are automatically "read"
+      readAt: messageData.direction === 'outbound' ? messageData.timestamp : null
     };
     
     customerData.conversations = customerData.conversations || [];
     customerData.conversations.push(newMessage);
+    
+    // Update profile with unread count and last activity
     customerData.profile.updatedAt = new Date().toISOString();
+    customerData.profile.lastActivity = messageData.timestamp;
+    
+    // Update unread count for inbound messages
+    if (messageData.direction === 'inbound') {
+      customerData.profile.unreadCount = (customerData.profile.unreadCount || 0) + 1;
+    }
     
     // Save to Firestore
     await customerDocRef.set(customerData);
@@ -176,11 +186,47 @@ async function storeCustomerMessage(messageData) {
 }
 
 /**
+ * Convert Firestore Timestamp to JavaScript Date
+ */
+function convertFirestoreTimestamp(timestamp) {
+  if (!timestamp) return null;
+  
+  // Handle Firestore Timestamp objects
+  if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+    return timestamp.toDate();
+  }
+  
+  // Handle regular JavaScript Date objects
+  if (timestamp instanceof Date) {
+    return timestamp;
+  }
+  
+  // Handle string timestamps
+  if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+    const date = new Date(timestamp);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  
+  return null;
+}
+
+/**
+ * Process conversations to convert timestamps
+ */
+function processConversationsTimestamps(conversations) {
+  return conversations.map(message => ({
+    ...message,
+    timestamp: convertFirestoreTimestamp(message.timestamp)
+  }));
+}
+
+/**
  * Get customer conversations for inbox display
  */
 async function getCustomerConversations(limit = 50) {
   try {
     const snapshot = await db.collection(CUSTOMER_COMMUNICATIONS_COLLECTION)
+      .orderBy('profile.lastActivity', 'desc')
       .limit(limit)
       .get();
     
@@ -190,23 +236,40 @@ async function getCustomerConversations(limit = 50) {
       const data = doc.data();
       const conversations = data.conversations || [];
       
+      // Convert timestamps in all conversations
+      const processedConversations = processConversationsTimestamps(conversations);
+      
       // Get latest message for preview
-      const latestMessage = conversations.length > 0 ? 
-        conversations[conversations.length - 1] : null;
+      const latestMessage = processedConversations.length > 0 ? 
+        processedConversations[processedConversations.length - 1] : null;
+      
+      // Convert profile timestamps
+      const profile = {
+        ...data.profile,
+        createdAt: convertFirestoreTimestamp(data.profile?.createdAt),
+        updatedAt: convertFirestoreTimestamp(data.profile?.updatedAt),
+        lastActivity: convertFirestoreTimestamp(data.profile?.lastActivity)
+      };
       
       customers.push({
         customerId: doc.id,
-        profile: data.profile,
+        profile: profile,
         latestMessage: latestMessage,
-        messageCount: conversations.length,
-        conversations: conversations
+        messageCount: processedConversations.length,
+        unreadCount: profile.unreadCount || 0,
+        conversations: processedConversations
       });
     });
     
-    // Sort by latest message timestamp
+    // Sort by unread status first, then by latest message timestamp
     customers.sort((a, b) => {
-      const aTime = a.latestMessage?.timestamp ? new Date(a.latestMessage.timestamp).getTime() : 0;
-      const bTime = b.latestMessage?.timestamp ? new Date(b.latestMessage.timestamp).getTime() : 0;
+      // Unread messages first
+      if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+      if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
+      
+      // Then by latest activity
+      const aTime = a.latestMessage?.timestamp ? a.latestMessage.timestamp.getTime() : 0;
+      const bTime = b.latestMessage?.timestamp ? b.latestMessage.timestamp.getTime() : 0;
       return bTime - aTime;
     });
     
@@ -258,12 +321,15 @@ async function sendReplyToCustomer(customerId, message) {
           from: process.env.TWILIO_PHONE_NUMBER,
           to: phone
         },
-        status: 'sent'
+        status: 'sent',
+        isRead: true, // Outbound messages are automatically "read"
+        readAt: new Date()
       };
       
       customerData.conversations = customerData.conversations || [];
       customerData.conversations.push(outboundMessage);
       customerData.profile.updatedAt = new Date().toISOString();
+      customerData.profile.lastActivity = new Date();
       
       await db.collection(CUSTOMER_COMMUNICATIONS_COLLECTION).doc(customerId).set(customerData);
       
@@ -284,10 +350,60 @@ async function sendReplyToCustomer(customerId, message) {
   }
 }
 
+/**
+ * Mark conversation as read for a customer
+ */
+async function markConversationAsRead(customerId) {
+  try {
+    const customerDocRef = db.collection(CUSTOMER_COMMUNICATIONS_COLLECTION).doc(customerId);
+    const customerDoc = await customerDocRef.get();
+    
+    if (!customerDoc.exists) {
+      throw new Error('Customer not found');
+    }
+    
+    const customerData = customerDoc.data();
+    const conversations = customerData.conversations || [];
+    
+    // Mark all unread messages as read
+    let hasUnreadMessages = false;
+    const now = new Date();
+    
+    const updatedConversations = conversations.map(message => {
+      if (message.direction === 'inbound' && !message.isRead) {
+        hasUnreadMessages = true;
+        return {
+          ...message,
+          isRead: true,
+          readAt: now
+        };
+      }
+      return message;
+    });
+    
+    if (hasUnreadMessages) {
+      // Update conversations and reset unread count
+      customerData.conversations = updatedConversations;
+      customerData.profile.unreadCount = 0;
+      customerData.profile.updatedAt = now.toISOString();
+      
+      await customerDocRef.set(customerData);
+      console.log(`✅ Marked conversation as read for customer ${customerId}`);
+    }
+    
+    return { success: true };
+    
+  } catch (error) {
+    console.error(`Error marking conversation as read: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   normalizePhoneNumber,
   getCustomerIdFromPhone,
   storeCustomerMessage,
   getCustomerConversations,
-  sendReplyToCustomer
+  sendReplyToCustomer,
+  markConversationAsRead
 };

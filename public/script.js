@@ -335,12 +335,17 @@ function displayConversations(conversations) {
         const timestamp = latestMessage && latestMessage.timestamp ? 
             formatTimestamp(latestMessage.timestamp) : '';
         
+        const unreadCount = customer.unreadCount || 0;
+        const hasUnread = unreadCount > 0;
+        const unreadClass = hasUnread ? 'customer-item-unread' : '';
+        const unreadBadge = hasUnread ? `<span class="unread-badge">${unreadCount}</span>` : '';
+        
         return `
-            <div class="customer-item" data-customer-id="${customer.customerId}" data-index="${index}">
-                <div class="message-timestamp">${timestamp}</div>
-                <div class="customer-name">${customer.profile.name || 'Unknown Customer'}</div>
+            <div class="customer-item ${unreadClass}" data-customer-id="${customer.customerId}" data-index="${index}">
+                <div class="message-timestamp">${timestamp}${unreadBadge}</div>
+                <div class="customer-name ${hasUnread ? 'customer-name-unread' : ''}">${customer.profile.name || 'Unknown Customer'}</div>
                 <div class="customer-phone">${customer.profile.phone || 'No phone'}</div>
-                <div class="message-preview">${escapeHtml(messagePreview)}</div>
+                <div class="message-preview ${hasUnread ? 'message-preview-unread' : ''}">${escapeHtml(messagePreview)}</div>
             </div>
         `;
     }).join('');
@@ -370,8 +375,49 @@ function selectCustomer(customerId, index) {
     selectedCustomer = conversations[index];
     displayConversation(selectedCustomer);
     
+    // Mark conversation as read if it has unread messages
+    if (selectedCustomer.unreadCount > 0) {
+        markConversationAsRead(customerId);
+    }
+    
     // Show quick reply
     document.getElementById('quick-reply').style.display = 'block';
+}
+
+// Function to mark conversation as read
+async function markConversationAsRead(customerId) {
+    try {
+        const response = await fetch(`/api/sms/mark-read/${customerId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update the conversation in memory to reflect read status
+            const customerIndex = conversations.findIndex(c => c.customerId === customerId);
+            if (customerIndex >= 0) {
+                conversations[customerIndex].unreadCount = 0;
+                
+                // Update visual indicators
+                const customerItem = document.querySelector(`[data-customer-id="${customerId}"]`);
+                if (customerItem) {
+                    customerItem.classList.remove('customer-item-unread');
+                    customerItem.querySelector('.customer-name').classList.remove('customer-name-unread');
+                    customerItem.querySelector('.message-preview').classList.remove('message-preview-unread');
+                    const unreadBadge = customerItem.querySelector('.unread-badge');
+                    if (unreadBadge) {
+                        unreadBadge.remove();
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error marking conversation as read:', error);
+    }
 }
 
 function displayConversation(customerData) {
