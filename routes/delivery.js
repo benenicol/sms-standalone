@@ -93,6 +93,18 @@ router.get('/orders', async (req, res) => {
       const deliveryMethod = determineDeliveryMethod(order);
       const isPickup = deliveryMethod === 'Pickup';
 
+      // Debug logging for classification
+      console.log('🏷️ Order classification:', {
+        orderNumber: order.orderNumber,
+        deliveryMethod: order.deliveryMethod,
+        shipping_lines: order.shipping_lines?.[0]?.title,
+        has_shipping_address: !!order.shipping_address,
+        has_billing_address: !!order.billing_address,
+        tags: order.tags,
+        classification: deliveryMethod,
+        isPickup: isPickup
+      });
+
       if (isPickup) {
         pickupOrders.push({
           ...order,
@@ -103,6 +115,16 @@ router.get('/orders', async (req, res) => {
       } else {
         // For deliveries, store the address (geocoding will be done during optimization)
         const address = order.shipping_address || order.billing_address;
+        console.log('📦 Delivery order address:', {
+          orderNumber: order.orderNumber,
+          address: address ? {
+            address1: address.address1,
+            city: address.city,
+            province: address.province,
+            country: address.country
+          } : null
+        });
+        
         deliveryOrders.push({
           ...order,
           section: 'freezer',

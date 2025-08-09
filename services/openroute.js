@@ -138,10 +138,12 @@ async function optimizeDeliveryRoute(orders, startLocation, options = {}) {
 async function geocodeAddress(address) {
   try {
     if (!ORS_API_KEY) {
+      console.error('❌ ORS_API_KEY environment variable not set');
       throw new Error('ORS_API_KEY environment variable not set');
     }
 
     const query = `${address.address1} ${address.city} ${address.province || ''} ${address.country || 'Australia'}`.trim();
+    console.log('🌍 Geocoding query:', query);
     
     const response = await axios.get(
       `${ORS_BASE_URL}/geocode/search`,
@@ -156,19 +158,30 @@ async function geocodeAddress(address) {
       }
     );
 
+    console.log('📡 ORS API Response status:', response.status);
+    console.log('📡 ORS API Response data:', JSON.stringify(response.data, null, 2));
+
     if (response.data && response.data.features && response.data.features.length > 0) {
       const feature = response.data.features[0];
-      return {
+      const result = {
         longitude: feature.geometry.coordinates[0],
         latitude: feature.geometry.coordinates[1],
         confidence: feature.properties.confidence || 0
       };
+      console.log('✅ Geocoding successful:', result);
+      return result;
     }
 
+    console.log('❌ No geocoding results found for query:', query);
     return null;
 
   } catch (error) {
-    console.error('❌ Geocoding error:', error.message);
+    console.error('❌ Geocoding error for query:', `${address.address1} ${address.city}`);
+    console.error('❌ Error details:', error.message);
+    if (error.response) {
+      console.error('❌ API Response status:', error.response.status);
+      console.error('❌ API Response data:', error.response.data);
+    }
     return null;
   }
 }
