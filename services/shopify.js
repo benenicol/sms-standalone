@@ -123,21 +123,51 @@ async function fetchOrdersForSMS({ status = 'fulfilled', limit = 50, days = 7, t
                    order.billing_address?.phone || 
                    order.shipping_address?.phone || '';
       
-      // Use actual Shopify delivery/fulfillment info
-      let deliveryMethod = 'Pending';
+      // Determine delivery method from shipping lines
+      let deliveryMethod = null;
       const shippingLines = order.shipping_lines || [];
       
-      // Use fulfillment status if available
-      if (order.fulfillment_status) {
-        deliveryMethod = order.fulfillment_status.charAt(0).toUpperCase() + order.fulfillment_status.slice(1);
-      } else if (shippingLines.length > 0) {
-        // Use shipping line title as fallback
-        deliveryMethod = shippingLines[0].title;
-      } else {
-        // Use financial status as last resort
-        deliveryMethod = order.financial_status ? 
-          order.financial_status.charAt(0).toUpperCase() + order.financial_status.slice(1) : 
-          'Pending';
+      // Primary: Use shipping line title to determine delivery method
+      if (shippingLines.length > 0) {
+        const shippingTitle = shippingLines[0].title.toLowerCase();
+        const shippingCode = shippingLines[0].code?.toLowerCase() || '';
+        
+        console.log(`🚚 Analyzing shipping for order ${order.order_number}:`, {
+          title: shippingLines[0].title,
+          code: shippingLines[0].code,
+          source: shippingLines[0].source,
+          price: shippingLines[0].price
+        });
+        
+        // Check for pickup keywords in title or code
+        if (shippingTitle.includes('pickup') || 
+            shippingTitle.includes('collection') || 
+            shippingTitle.includes('collect') ||
+            shippingTitle.includes('market') ||
+            shippingCode.includes('pickup') ||
+            shippingCode.includes('collection')) {
+          deliveryMethod = 'Pickup';
+        }
+        // Check for delivery keywords in title or code
+        else if (shippingTitle.includes('delivery') || 
+                 shippingTitle.includes('shipping') || 
+                 shippingTitle.includes('post') ||
+                 shippingTitle.includes('courier') ||
+                 shippingTitle.includes('express') ||
+                 shippingCode.includes('delivery') ||
+                 shippingCode.includes('shipping')) {
+          deliveryMethod = 'Home Delivery';
+        }
+        // Store the original shipping title for manual review
+        else {
+          deliveryMethod = shippingLines[0].title;
+          console.log(`⚠️ Unknown shipping method for order ${order.order_number}: "${shippingLines[0].title}"`);
+        }
+      }
+      
+      // Fallback: No shipping lines means likely pickup or special handling
+      if (!deliveryMethod) {
+        deliveryMethod = 'Unknown';
       }
       
       // Create a readable order description from line items
