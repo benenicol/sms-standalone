@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Allynview Farm Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .dashboard-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .dashboard-header {
+            margin-bottom: 50px;
+        }
+
+        .dashboard-header h1 {
+            color: #395f33;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .dashboard-subtitle {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+        }
+
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .app-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .app-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            border-color: #395f33;
+        }
+
+        .app-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .sms-card .app-icon {
+            color: #3b82f6;
+        }
+
+        .delivery-card .app-icon {
+            color: #10b981;
+        }
+
+        .app-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--text-primary);
+        }
+
+        .app-description {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .app-features {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .app-features ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .app-features li {
+            padding: 5px 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .app-features li::before {
+            content: "✓ ";
+            color: #10b981;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .launch-button {
+            background: linear-gradient(135deg, #395f33, #4a7c59);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .launch-button:hover {
+            background: linear-gradient(135deg, #2d4929, #3a5e47);
+            transform: translateY(-2px);
+        }
+
+        .dashboard-footer {
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .user-info {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .logout-section {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-container {
+                margin: 20px auto;
+                padding: 20px;
+            }
+
+            .dashboard-header h1 {
+                font-size: 2rem;
+            }
+
+            .app-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .app-card {
+                padding: 30px 20px;
+            }
+
+            .logout-section {
+                flex-direction: column;
+            }
+        }
+
+        .quick-stats {
+            background: #f8fffe;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid #d1fae5;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            text-align: center;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #395f33;
+            display: block;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <h1>🌱 Allynview Farm</h1>
+            <p class="dashboard-subtitle">Farm Management Dashboard</p>
+        </div>
+
+        <div class="quick-stats">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-number" id="active-orders">--</span>
+                    <div class="stat-label">Active Orders</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="pending-deliveries">--</span>
+                    <div class="stat-label">Pending Deliveries</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="market-pickups">--</span>
+                    <div class="stat-label">Market Pickups</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="unread-messages">--</span>
+                    <div class="stat-label">Unread Messages</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="app-grid">
+            <a href="/index.html" class="app-card sms-card">
+                <span class="app-icon">📱</span>
+                <div class="app-title">SMS Manager</div>
+                <div class="app-description">
+                    Manage customer communications, send bulk SMS notifications, and handle customer conversations.
+                </div>
+                <div class="app-features">
+                    <ul>
+                        <li>Send bulk SMS to customers</li>
+                        <li>Manage customer conversations</li>
+                        <li>Customizable message templates</li>
+                        <li>Order-based notifications</li>
+                    </ul>
+                </div>
+                <div class="launch-button">Launch SMS Manager</div>
+            </a>
+
+            <a href="/delivery.html" class="app-card delivery-card">
+                <span class="app-icon">🚛</span>
+                <div class="app-title">Delivery Manager</div>
+                <div class="app-description">
+                    Optimize delivery routes, manage truck loading, and track deliveries with barcode scanning.
+                </div>
+                <div class="app-features">
+                    <ul>
+                        <li>Truck loading with barcode scanner</li>
+                        <li>Route optimization</li>
+                        <li>Delivery & pickup management</li>
+                        <li>Progress tracking & exports</li>
+                    </ul>
+                </div>
+                <div class="launch-button">Launch Delivery Manager</div>
+            </a>
+        </div>
+
+        <div class="dashboard-footer">
+            <div class="user-info">
+                Welcome back! You're logged in as <strong>orders@allynview.com.au</strong>
+            </div>
+            <div class="logout-section">
+                <span class="status-indicator connected">
+                    <span class="dot"></span>
+                    <span>System Online</span>
+                </span>
+                <button id="logout-btn" class="btn btn-secondary">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load quick stats
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                // Load order statistics
+                const ordersResponse = await fetch('/api/delivery/orders?days=7');
+                const ordersData = await ordersResponse.json();
+                
+                if (ordersData.success) {
+                    document.getElementById('active-orders').textContent = ordersData.summary?.total || '0';
+                    document.getElementById('pending-deliveries').textContent = ordersData.summary?.deliveries || '0';
+                    document.getElementById('market-pickups').textContent = ordersData.summary?.pickups || '0';
+                }
+
+                // Load conversation statistics
+                const conversationsResponse = await fetch('/api/sms/conversations?limit=10');
+                const conversationsData = await conversationsResponse.json();
+                
+                if (conversationsData.success) {
+                    const unreadCount = conversationsData.conversations?.reduce((count, conv) => 
+                        count + (conv.unreadCount || 0), 0) || 0;
+                    document.getElementById('unread-messages').textContent = unreadCount.toString();
+                }
+            } catch (error) {
+                console.error('Error loading dashboard stats:', error);
+                // Set fallback values
+                document.getElementById('active-orders').textContent = '0';
+                document.getElementById('pending-deliveries').textContent = '0';
+                document.getElementById('market-pickups').textContent = '0';
+                document.getElementById('unread-messages').textContent = '0';
+            }
+        });
+
+        // Logout functionality
+        document.getElementById('logout-btn').addEventListener('click', async function() {
+            try {
+                const response = await fetch('/auth/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    window.location.href = '/login';
+                } else {
+                    alert('Logout failed. Please try again.');
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('Logout failed. Please try again.');
+            }
+        });
+    </script>
+</body>
+</html>

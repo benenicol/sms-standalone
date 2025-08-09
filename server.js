@@ -131,23 +131,7 @@ try {
 // Public webhook routes (MUST be before authentication middleware)
 app.use('/webhook', webhookRoutes);
 
-// Authentication middleware
-const requireAuth = (req, res, next) => {
-  if (req.session.authenticated) {
-    return next();
-  }
-  
-  // If it's an API request, return JSON
-  if (req.path.startsWith('/api/')) {
-    return res.status(401).json({ success: false, message: 'Authentication required' });
-  }
-  
-  // For regular requests, redirect to login
-  res.redirect('/login');
-};
-
-// Static files - Vercel-compatible configuration (protected)
-app.use(requireAuth);
+// Serve static files BEFORE authentication (allows CSS/JS to load)
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, path) => {
     if (path.endsWith('.css')) {
@@ -158,13 +142,43 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
+// Authentication middleware for HTML pages only
+const requireAuth = (req, res, next) => {
+  if (req.session.authenticated) {
+    return next();
+  }
+  
+  // If it's an API request, return JSON
+  if (req.path.startsWith('/api/')) {
+    return res.status(401).json({ success: false, message: 'Authentication required' });
+  }
+  
+  // Allow static assets (CSS, JS, images) to load without auth
+  if (req.path.match(/\.(css|js|png|jpg|jpeg|gif|ico|svg)$/i)) {
+    return next();
+  }
+  
+  // For HTML requests, redirect to login
+  res.redirect('/login');
+};
+
 // Protected API routes
 app.use('/api/sms', requireAuth, smsRoutes);
 app.use('/api/delivery', requireAuth, deliveryRoutes);
 
-// Serve main interface
-app.get('/', (req, res) => {
+// Serve dashboard as main page (protected)
+app.get('/', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+// Serve SMS interface (protected)
+app.get('/index.html', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Serve delivery interface (protected)
+app.get('/delivery.html', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'delivery.html'));
 });
 
 // Health check with environment validation
