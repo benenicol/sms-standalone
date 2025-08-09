@@ -3,6 +3,61 @@ const router = express.Router();
 const { fetchOrdersForSMS } = require('../services/shopify');
 const { optimizeDeliveryRoute, geocodeAddress, validateOrsConfig } = require('../services/openroute');
 
+/**
+ * Determine delivery method using same logic as SMS system
+ */
+function determineDeliveryMethod(order) {
+  console.log('🚚 Determining delivery method for order:', {
+    orderNumber: order.orderNumber || order.name,
+    deliveryMethod: order.deliveryMethod,
+    shipping_lines: order.shipping_lines,
+    has_shipping_address: !!order.shipping_address,
+    shipping_address: order.shipping_address
+  });
+  
+  // First check if we have a deliveryMethod from Shopify service
+  if (order.deliveryMethod) {
+    const method = order.deliveryMethod.toLowerCase();
+    if (method.includes('pickup') || method.includes('collection')) {
+      return 'Pickup';
+    }
+    if (method.includes('delivery') || method.includes('shipping') || method.includes('home')) {
+      return 'Home Delivery';
+    }
+  }
+  
+  // Check shipping method title
+  if (order.shipping_lines && order.shipping_lines.length > 0) {
+    const shippingTitle = order.shipping_lines[0].title.toLowerCase();
+    console.log('🚛 Checking shipping title:', shippingTitle);
+    
+    if (shippingTitle.includes('pickup') || shippingTitle.includes('collection')) {
+      return 'Pickup';
+    }
+    if (shippingTitle.includes('delivery') || shippingTitle.includes('shipping') || shippingTitle.includes('home')) {
+      return 'Home Delivery';
+    }
+  }
+  
+  // Check if there's a shipping address (more detailed check)
+  if (order.shipping_address && 
+      (order.shipping_address.address1 || order.shipping_address.city)) {
+    console.log('📍 Has shipping address, marking as Home Delivery');
+    return 'Home Delivery';
+  }
+  
+  // Check billing address as fallback for home delivery
+  if (order.billing_address && order.billing_address.address1 && 
+      !order.shipping_address) {
+    console.log('💳 No shipping address but has billing address, marking as Home Delivery');
+    return 'Home Delivery';
+  }
+  
+  // Default fallback
+  console.log('📦 Defaulting to Pickup');
+  return 'Pickup';
+}
+
 // Farm location coordinates (you can update these to your actual farm location)
 const FARM_LOCATION = [151.2093, -33.8688]; // Default to Sydney, update with actual coordinates
 const NEWCASTLE_MARKETS = [151.7789, -32.9283]; // Newcastle Markets coordinates
@@ -30,23 +85,20 @@ router.get('/orders', async (req, res) => {
       order.fulfillmentStatus === 'partial'
     );
 
-    // Categorize orders
+    // Categorize orders using same logic as SMS system
     const deliveryOrders = [];
     const pickupOrders = [];
 
     for (const order of unfulfilledOrders) {
-      // Determine delivery method more accurately
-      const isPickup = order.deliveryMethod === 'Pickup' || 
-                      (order.tags && order.tags.some(tag => 
-                        tag.toLowerCase().includes('pickup') || 
-                        tag.toLowerCase().includes('market')
-                      ));
+      const deliveryMethod = determineDeliveryMethod(order);
+      const isPickup = deliveryMethod === 'Pickup';
 
       if (isPickup) {
         pickupOrders.push({
           ...order,
           section: 'fridge',
-          deliveryType: 'pickup'
+          deliveryType: 'pickup',
+          deliveryMethod: 'Pickup'
         });
       } else {
         // For deliveries, try to geocode the address
@@ -57,6 +109,7 @@ router.get('/orders', async (req, res) => {
             ...order,
             section: 'freezer',
             deliveryType: 'delivery',
+            deliveryMethod: 'Home Delivery',
             customer: {
               ...order.customer,
               address: {
@@ -70,7 +123,8 @@ router.get('/orders', async (req, res) => {
           deliveryOrders.push({
             ...order,
             section: 'freezer',
-            deliveryType: 'delivery'
+            deliveryType: 'delivery',
+            deliveryMethod: 'Home Delivery'
           });
         }
       }
@@ -109,6 +163,8 @@ router.post('/optimize-route', async (req, res) => {
   try {
     const { orders, options = {} } = req.body;
 
+    console.log('🗺️ Route optimization requested for', orders?.length || 0, 'orders');
+
     if (!orders || orders.length === 0) {
       return res.json({
         success: true,
@@ -119,31 +175,41 @@ router.post('/optimize-route', async (req, res) => {
     }
 
     // Filter delivery orders only
-    const deliveryOrders = orders.filter(order => 
-      order.deliveryType === 'delivery' && 
-      order.customer?.address?.longitude && 
-      order.customer?.address?.latitude
-    );
+    const deliveryOrders = orders.filter(order => {
+      const isDelivery = order.deliveryType === 'delivery';
+      const hasCoordinates = order.customer?.address?.longitude && order.customer?.address?.latitude;
+      console.log('🚚 Order', order.orderNumber, '- isDelivery:', isDelivery, 'hasCoordinates:', hasCoordinates);
+      return isDelivery && hasCoordinates;
+    });
+
+    console.log('📍 Found', deliveryOrders.length, 'delivery orders with coordinates');
 
     if (deliveryOrders.length === 0) {
       return res.json({
         success: true,
         optimizedRoute: [],
         packingOrder: [],
-        message: 'No delivery orders with valid addresses found'
+        message: 'No delivery orders with valid addresses found',
+        debug: {
+          totalOrders: orders.length,
+          deliveryOrders: orders.filter(o => o.deliveryType === 'delivery').length,
+          ordersWithCoordinates: orders.filter(o => o.customer?.address?.longitude).length
+        }
       });
     }
 
+    console.log('🌐 Starting route optimization with OpenRoute Service...');
     const optimization = await optimizeDeliveryRoute(
       deliveryOrders, 
       FARM_LOCATION, 
       options
     );
 
+    console.log('✅ Route optimization completed:', optimization.success ? 'Success' : 'Failed');
     res.json(optimization);
 
   } catch (error) {
-    console.error('Error optimizing route:', error);
+    console.error('❌ Error optimizing route:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message,
@@ -278,7 +344,8 @@ router.get('/validate-ors', async (req, res) => {
     res.json({
       success: true,
       orsConfigured: isValid,
-      message: isValid ? 'ORS API configured correctly' : 'ORS API configuration issue'
+      message: isValid ? 'ORS API configured correctly' : 'ORS API configuration issue',
+      apiKey: process.env.ORS_API_KEY ? 'Set' : 'Not set'
     });
 
   } catch (error) {
@@ -287,6 +354,39 @@ router.get('/validate-ors', async (req, res) => {
       success: false, 
       error: error.message,
       orsConfigured: false
+    });
+  }
+});
+
+/**
+ * Test geocoding for debugging
+ */
+router.post('/test-geocoding', async (req, res) => {
+  try {
+    const { address } = req.body;
+    
+    if (!address) {
+      return res.status(400).json({
+        success: false,
+        error: 'Address is required'
+      });
+    }
+
+    console.log('🌍 Testing geocoding for address:', address);
+    const coordinates = await geocodeAddress(address);
+    
+    res.json({
+      success: true,
+      address,
+      coordinates,
+      message: coordinates ? 'Geocoding successful' : 'No coordinates found'
+    });
+
+  } catch (error) {
+    console.error('Error testing geocoding:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
     });
   }
 });

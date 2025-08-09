@@ -18,7 +18,12 @@ async function optimizeDeliveryRoute(orders, startLocation, options = {}) {
 
     // Prepare jobs (delivery locations)
     const jobs = orders
-      .filter(order => order.deliveryMethod === 'Home Delivery' && order.customer.address)
+      .filter(order => {
+        const hasDelivery = order.deliveryType === 'delivery' || order.deliveryMethod === 'Home Delivery';
+        const hasCoordinates = order.customer?.address?.longitude && order.customer?.address?.latitude;
+        console.log('📍 Filtering order:', order.orderNumber, 'hasDelivery:', hasDelivery, 'hasCoordinates:', hasCoordinates);
+        return hasDelivery && hasCoordinates;
+      })
       .map((order, index) => ({
         id: parseInt(order.id) || index + 1,
         service: 300, // 5 minutes per delivery
@@ -29,6 +34,8 @@ async function optimizeDeliveryRoute(orders, startLocation, options = {}) {
         ],
         description: `Order ${order.orderNumber} - ${order.customer.name}`
       }));
+
+    console.log('📦 Prepared jobs for optimization:', jobs.length, 'out of', orders.length, 'orders');
 
     if (jobs.length === 0) {
       return {

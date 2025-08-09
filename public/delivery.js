@@ -566,11 +566,21 @@ async function optimizeRoute() {
     try {
         updateStatus('processing', 'Optimizing delivery route...');
         
+        console.log('🗺️ Starting route optimization...');
+        console.log('📦 Delivery orders:', deliveryOrders.length);
+        console.log('🏪 Pickup orders:', pickupOrders.length);
+        
         if (deliveryOrders.length === 0) {
-            showError('No delivery orders to optimize');
+            showError('No delivery orders to optimize. Make sure you have orders with delivery addresses.');
             updateStatus('ready', 'No deliveries to optimize');
             return;
         }
+
+        // Log orders with addresses for debugging
+        const ordersWithAddresses = deliveryOrders.filter(order => 
+            order.customer?.address?.longitude && order.customer?.address?.latitude
+        );
+        console.log('📍 Orders with coordinates:', ordersWithAddresses.length, 'out of', deliveryOrders.length);
         
         const response = await fetch('/api/delivery/optimize-route', {
             method: 'POST',
@@ -582,17 +592,23 @@ async function optimizeRoute() {
         });
         
         const result = await response.json();
+        console.log('🌐 Route optimization result:', result);
         
         if (result.success) {
-            optimizedRoute = result;
-            displayOptimizedRoute(result);
-            updateStatus('ready', `Route optimized: ${result.summary?.deliveries || 0} stops`);
+            if (result.message) {
+                showError(result.message + (result.debug ? ` (${JSON.stringify(result.debug)})` : ''));
+                updateStatus('ready', result.message);
+            } else {
+                optimizedRoute = result;
+                displayOptimizedRoute(result);
+                updateStatus('ready', `Route optimized: ${result.summary?.deliveries || 0} stops`);
+            }
         } else {
             throw new Error(result.error || 'Route optimization failed');
         }
         
     } catch (error) {
-        console.error('Error optimizing route:', error);
+        console.error('❌ Error optimizing route:', error);
         updateStatus('error', 'Route optimization failed');
         showError('Failed to optimize route: ' + error.message);
     }
