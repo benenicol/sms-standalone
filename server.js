@@ -65,14 +65,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session configuration
+// Session configuration - optimized for serverless
 app.use(session({
   secret: process.env.SESSION_SECRET || 'allynview-farm-secure-session-key-2024',
-  resave: false,
-  saveUninitialized: false,
-  name: 'allynview.sid', // Custom session name
+  resave: true, // Force session to be saved back to the session store
+  saveUninitialized: true, // Force session to be saved even when unmodified
+  name: 'allynview_session', // Custom session name without dots
+  rolling: true, // Reset expiry on each request
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    secure: false, // Always false for now to ensure it works
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: 'lax' // Help with session persistence
@@ -146,17 +147,6 @@ try {
 // Public webhook routes (MUST be before authentication middleware)
 app.use('/webhook', webhookRoutes);
 
-// Serve static files BEFORE authentication (allows CSS/JS to load)
-app.use(express.static(path.join(__dirname, 'public'), {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css');
-    } else if (path.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript');
-    }
-  }
-}));
-
 // Authentication middleware for HTML pages only
 const requireAuth = (req, res, next) => {
   console.log('🔐 Auth check for:', req.path, 'Session ID:', req.sessionID, 'Authenticated:', req.session.authenticated);
@@ -181,24 +171,36 @@ const requireAuth = (req, res, next) => {
   res.redirect('/login');
 };
 
+// Serve specific HTML routes BEFORE static middleware (protected)
+app.get('/', requireAuth, (req, res) => {
+  console.log('📊 Serving dashboard');
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+app.get('/index.html', requireAuth, (req, res) => {
+  console.log('📱 Serving SMS interface');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/delivery.html', requireAuth, (req, res) => {
+  console.log('🚛 Serving delivery interface');
+  res.sendFile(path.join(__dirname, 'public', 'delivery.html'));
+});
+
 // Protected API routes
 app.use('/api/sms', requireAuth, smsRoutes);
 app.use('/api/delivery', requireAuth, deliveryRoutes);
 
-// Serve dashboard as main page (protected)
-app.get('/', requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
-});
-
-// Serve SMS interface (protected)
-app.get('/index.html', requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Serve delivery interface (protected)
-app.get('/delivery.html', requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'delivery.html'));
-});
+// Serve static files AFTER specific routes (allows CSS/JS to load but doesn't override routes)
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
 
 // Health check with environment validation
 app.get('/health', (req, res) => {
