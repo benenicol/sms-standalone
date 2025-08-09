@@ -955,55 +955,107 @@ function parseTagTemplates() {
     return templates;
 }
 
+/**
+ * Determine delivery method using enhanced logic with shipping line analysis
+ * This matches the logic used in the delivery system for consistency
+ */
 function determineDeliveryMethod(order) {
-    console.log('Determining delivery method for order:', {
+    console.log('🚚 Determining delivery method for order:', {
         orderNumber: order.orderNumber || order.name,
         deliveryMethod: order.deliveryMethod,
         shipping_lines: order.shipping_lines,
         has_shipping_address: !!order.shipping_address,
-        shipping_address: order.shipping_address
+        has_billing_address: !!order.billing_address,
+        tags: order.tags
     });
     
-    // First check if we have a deliveryMethod from Shopify service
+    // Priority 1: Check if deliveryMethod is already properly classified by Shopify service
     if (order.deliveryMethod) {
-        const method = order.deliveryMethod.toLowerCase();
-        if (method.includes('pickup') || method.includes('collection')) {
-            return 'Pickup';
+        if (order.deliveryMethod === 'Pickup' || order.deliveryMethod === 'Home Delivery') {
+            console.log(`✅ Using classified delivery method: ${order.deliveryMethod}`);
+            return order.deliveryMethod;
         }
-        if (method.includes('delivery') || method.includes('shipping') || method.includes('home')) {
-            return 'Home Delivery';
-        }
-    }
-    
-    // Check shipping method title
-    if (order.shipping_lines && order.shipping_lines.length > 0) {
-        const shippingTitle = order.shipping_lines[0].title.toLowerCase();
-        console.log('Checking shipping title:', shippingTitle);
         
-        if (shippingTitle.includes('pickup') || shippingTitle.includes('collection')) {
+        // Fallback: Check for keywords in the raw delivery method
+        const method = order.deliveryMethod.toLowerCase();
+        if (method.includes('pickup') || method.includes('collection') || method.includes('market')) {
+            console.log('📦 Pickup detected from deliveryMethod keywords');
             return 'Pickup';
         }
-        if (shippingTitle.includes('delivery') || shippingTitle.includes('shipping') || shippingTitle.includes('home')) {
+        if (method.includes('delivery') || method.includes('shipping') || method.includes('post') || method.includes('courier')) {
+            console.log('🚚 Delivery detected from deliveryMethod keywords');
             return 'Home Delivery';
         }
     }
     
-    // Check if there's a shipping address (more detailed check)
-    if (order.shipping_address && 
-        (order.shipping_address.address1 || order.shipping_address.city)) {
-        console.log('Has shipping address, marking as Home Delivery');
+    // Priority 2: Check order tags for manual classification
+    if (order.tags && order.tags.length > 0) {
+        const tagString = order.tags.join(',').toLowerCase();
+        if (tagString.includes('pickup') || tagString.includes('collection') || tagString.includes('market')) {
+            console.log('🏷️ Pickup detected from order tags');
+            return 'Pickup';
+        }
+        if (tagString.includes('delivery') || tagString.includes('shipping')) {
+            console.log('🏷️ Delivery detected from order tags');
+            return 'Home Delivery';
+        }
+    }
+    
+    // Priority 3: Enhanced shipping line analysis
+    if (order.shipping_lines && order.shipping_lines.length > 0) {
+        const shippingLine = order.shipping_lines[0];
+        const title = (shippingLine.title || '').toLowerCase();
+        const code = (shippingLine.code || '').toLowerCase();
+        
+        console.log('🚛 Analyzing shipping line:', { title: shippingLine.title, code: shippingLine.code });
+        
+        // Check for pickup indicators
+        const pickupKeywords = ['pickup', 'collection', 'collect', 'market', 'store pickup', 'local pickup'];
+        if (pickupKeywords.some(keyword => title.includes(keyword) || code.includes(keyword))) {
+            console.log('📦 Pickup detected from shipping line');
+            return 'Pickup';
+        }
+        
+        // Check for delivery indicators
+        const deliveryKeywords = ['delivery', 'shipping', 'post', 'courier', 'express', 'standard', 'home delivery'];
+        if (deliveryKeywords.some(keyword => title.includes(keyword) || code.includes(keyword))) {
+            console.log('🚚 Delivery detected from shipping line');
+            return 'Home Delivery';
+        }
+    }
+    
+    // Priority 4: Address-based detection with improved logic
+    const hasValidShippingAddress = order.shipping_address && 
+        (order.shipping_address.address1 || order.shipping_address.city);
+    
+    const hasValidBillingAddress = order.billing_address && 
+        (order.billing_address.address1 || order.billing_address.city);
+    
+    // If there's a shipping address different from billing, likely delivery
+    if (hasValidShippingAddress && hasValidBillingAddress) {
+        const shippingSame = order.shipping_address.address1 === order.billing_address.address1 &&
+                            order.shipping_address.city === order.billing_address.city;
+        
+        if (!shippingSame) {
+            console.log('📍 Different shipping/billing addresses, marking as Home Delivery');
+            return 'Home Delivery';
+        }
+    }
+    
+    // If only shipping address exists, likely delivery
+    if (hasValidShippingAddress && !hasValidBillingAddress) {
+        console.log('📍 Has shipping address only, marking as Home Delivery');
         return 'Home Delivery';
     }
     
-    // Check billing address as fallback for home delivery
-    if (order.billing_address && order.billing_address.address1 && 
-        !order.shipping_address) {
-        console.log('No shipping address but has billing address, checking if same customer');
-        return 'Home Delivery';
+    // If only billing address exists, likely pickup (customer will collect)
+    if (!hasValidShippingAddress && hasValidBillingAddress) {
+        console.log('💳 Has billing address only, marking as Pickup');
+        return 'Pickup';
     }
     
-    // Default fallback
-    console.log('Defaulting to Pickup');
+    // Final fallback: Default to pickup for local business model
+    console.log('📦 Using default fallback: Pickup');
     return 'Pickup';
 }
 
