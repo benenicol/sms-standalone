@@ -108,6 +108,25 @@ app.post('/auth/logout', (req, res) => {
   });
 });
 
+// Import routes with error handling
+let webhookRoutes, smsRoutes;
+try {
+  console.log('📦 Loading webhook routes...');
+  webhookRoutes = require('./routes/webhook');
+  console.log('✅ Webhook routes loaded');
+  
+  console.log('📦 Loading SMS routes...');
+  smsRoutes = require('./routes/sms');
+  console.log('✅ SMS routes loaded');
+} catch (error) {
+  console.error('❌ Error loading routes:', error.message);
+  console.error('Stack:', error.stack);
+  process.exit(1);
+}
+
+// Public webhook routes (MUST be before authentication middleware)
+app.use('/webhook', webhookRoutes);
+
 // Authentication middleware
 const requireAuth = (req, res, next) => {
   if (req.session.authenticated) {
@@ -115,7 +134,7 @@ const requireAuth = (req, res, next) => {
   }
   
   // If it's an API request, return JSON
-  if (req.path.startsWith('/api/') || req.path.startsWith('/webhook/')) {
+  if (req.path.startsWith('/api/')) {
     return res.status(401).json({ success: false, message: 'Authentication required' });
   }
   
@@ -135,24 +154,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
-// Import routes with error handling
-let webhookRoutes, smsRoutes;
-try {
-  console.log('📦 Loading webhook routes...');
-  webhookRoutes = require('./routes/webhook');
-  console.log('✅ Webhook routes loaded');
-  
-  console.log('📦 Loading SMS routes...');
-  smsRoutes = require('./routes/sms');
-  console.log('✅ SMS routes loaded');
-} catch (error) {
-  console.error('❌ Error loading routes:', error.message);
-  console.error('Stack:', error.stack);
-  process.exit(1);
-}
-
-// Routes - webhooks are public, SMS API requires authentication
-app.use('/webhook', webhookRoutes);
+// Protected SMS API routes
 app.use('/api/sms', requireAuth, smsRoutes);
 
 // Serve main interface
