@@ -219,7 +219,16 @@ window.loadOrders = async function loadOrders() {
             params.append('tag', tag);
         }
         
-        const response = await fetch(`/api/sms/orders?${params}`);
+        const response = await fetch(`/api/sms/orders?${params}`, {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            const text = await response.text();
+            console.log('API Response:', text);
+            throw new Error(`HTTP ${response.status}: ${text}`);
+        }
+        
         const data = await response.json();
         
         if (data.success) {
@@ -472,6 +481,7 @@ window.sendBulkSMS = async function sendBulkSMS(testMode = false) {
             headers: {
                 'Content-Type': 'application/json',
             },
+            credentials: 'include',
             body: JSON.stringify({
                 orders: bulkMessages,
                 message: '', // Not used since each order has its own message
@@ -501,7 +511,16 @@ window.loadConversations = async function loadConversations() {
     try {
         updateStatus('connecting', 'Loading conversations...');
         
-        const response = await fetch('/api/sms/conversations?limit=50');
+        const response = await fetch('/api/sms/conversations?limit=50', {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            const text = await response.text();
+            console.log('API Response:', text);
+            throw new Error(`HTTP ${response.status}: ${text}`);
+        }
+        
         const data = await response.json();
         
         if (data.success) {
@@ -594,7 +613,8 @@ async function markConversationAsRead(customerId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            credentials: 'include'
         });
         
         const data = await response.json();
@@ -687,6 +707,7 @@ window.sendReply = async function sendReply() {
             headers: {
                 'Content-Type': 'application/json',
             },
+            credentials: 'include',
             body: JSON.stringify({
                 customerId: selectedCustomer.customerId,
                 message: message
@@ -763,6 +784,7 @@ window.sendTestSMS = async function sendTestSMS() {
             headers: {
                 'Content-Type': 'application/json',
             },
+            credentials: 'include',
             body: JSON.stringify({
                 phone: phone,
                 message: message
@@ -1123,7 +1145,8 @@ async function handleLogout() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-            }
+            },
+            credentials: 'include'
         });
         
         const result = await response.json();
