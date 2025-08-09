@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Truck Loading & Delivery Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="delivery.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚛 Truck Loading & Delivery Manager</h1>
+            <div class="header-right">
+                <div class="status-indicator" id="status">
+                    <span class="dot"></span>
+                    <span id="status-text">Ready</span>
+                </div>
+                <button id="logout-btn" class="btn btn-secondary btn-small">Logout</button>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab" data-tab="back" onclick="window.location.href='/'">← SMS Manager</button>
+            <button class="tab active" data-tab="loading">📦 Truck Loading</button>
+            <button class="tab" data-tab="routing">🗺️ Route Planning</button>
+            <button class="tab" data-tab="tracking">📊 Tracking</button>
+        </nav>
+
+        <!-- Truck Loading Tab -->
+        <div id="loading-tab" class="tab-content active">
+            <div class="loading-section">
+                <div class="loading-controls">
+                    <button id="load-orders-btn" class="btn btn-primary">📦 Load Unfulfilled Orders</button>
+                    <button id="scan-mode-btn" class="btn btn-secondary">📱 Start Barcode Scanner</button>
+                    <button id="optimize-btn" class="btn btn-success">🗺️ Optimize Route</button>
+                    <div class="loading-summary" id="loading-summary">
+                        <span id="order-counts">No orders loaded</span>
+                    </div>
+                </div>
+
+                <div class="truck-sections">
+                    <!-- Freezer Section (Deliveries) -->
+                    <div class="truck-section freezer-section">
+                        <div class="section-header">
+                            <h3>🧊 Freezer Section (Deliveries)</h3>
+                            <div class="section-info">
+                                <span id="freezer-count">0 orders</span>
+                                <span class="section-note">Pack in reverse delivery order</span>
+                            </div>
+                        </div>
+                        <div class="section-content" id="freezer-content">
+                            <div class="empty-section">
+                                <p>No delivery orders loaded</p>
+                                <p class="section-help">Delivery orders will appear here</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fridge Section (Pickups) -->
+                    <div class="truck-section fridge-section">
+                        <div class="section-header">
+                            <h3>❄️ Fridge Section (Newcastle Markets)</h3>
+                            <div class="section-info">
+                                <span id="fridge-count">0 orders</span>
+                                <span class="section-note">Customer pickup orders</span>
+                            </div>
+                        </div>
+                        <div class="section-content" id="fridge-content">
+                            <div class="empty-section">
+                                <p>No pickup orders loaded</p>
+                                <p class="section-help">Pickup orders will appear here</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- USB Scanner Interface -->
+                <div id="scanner-interface" class="scanner-interface" style="display: none;">
+                    <div class="scanner-header">
+                        <h3>📱 USB Barcode Scanner Active</h3>
+                        <button id="close-scanner" class="btn btn-secondary btn-small">Stop Scanner</button>
+                    </div>
+                    <div class="scanner-section">
+                        <div class="scanner-instructions">
+                            <h4>🔴 Scanner Mode Active</h4>
+                            <p>Scan barcodes with your USB scanner or enter order numbers manually below.</p>
+                            <p class="scanner-tip"><strong>Tip:</strong> Focus will automatically return to this page to capture scanned codes.</p>
+                        </div>
+                        <div class="scanner-controls">
+                            <input type="text" id="manual-input" placeholder="Enter order number manually" class="manual-input">
+                            <button id="manual-submit" class="btn btn-primary">Add Order</button>
+                        </div>
+                    </div>
+                    <div class="recent-scans" id="recent-scans">
+                        <h4>Recent Scans</h4>
+                        <div class="scan-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Route Planning Tab -->
+        <div id="routing-tab" class="tab-content">
+            <div class="routing-section">
+                <div class="routing-controls">
+                    <div class="route-options">
+                        <h3>🗺️ Route Optimization</h3>
+                        <div class="control-group">
+                            <label for="driver-count">Number of Drivers:</label>
+                            <select id="driver-count">
+                                <option value="1">1 Driver</option>
+                                <option value="2">2 Drivers</option>
+                            </select>
+                        </div>
+                        <div class="control-group" id="split-point-group" style="display: none;">
+                            <label for="split-point">Split Point:</label>
+                            <input type="number" id="split-point" min="1" placeholder="Order number">
+                        </div>
+                        <button id="optimize-route-btn" class="btn btn-primary">🚀 Optimize Route</button>
+                        <button id="reset-route-btn" class="btn btn-secondary">🔄 Reset</button>
+                    </div>
+                </div>
+
+                <div class="route-results" id="route-results">
+                    <div class="route-summary" id="route-summary" style="display: none;">
+                        <h4>Route Summary</h4>
+                        <div class="summary-stats"></div>
+                    </div>
+                    
+                    <div class="route-visualization" id="route-visualization">
+                        <div class="route-placeholder">
+                            <h3>📍 Route Visualization</h3>
+                            <p>Load orders and click "Optimize Route" to see the optimized delivery sequence</p>
+                        </div>
+                    </div>
+
+                    <div class="packing-order" id="packing-order" style="display: none;">
+                        <h4>📦 Truck Loading Order (Reverse Sequence)</h4>
+                        <div class="packing-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tracking Tab -->
+        <div id="tracking-tab" class="tab-content">
+            <div class="tracking-section">
+                <h3>📊 Loading Progress</h3>
+                <div class="progress-overview">
+                    <div class="progress-card">
+                        <h4>Freezer Section</h4>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="freezer-progress" style="width: 0%"></div>
+                        </div>
+                        <span id="freezer-progress-text">0 / 0 loaded</span>
+                    </div>
+                    <div class="progress-card">
+                        <h4>Fridge Section</h4>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="fridge-progress" style="width: 0%"></div>
+                        </div>
+                        <span id="fridge-progress-text">0 / 0 loaded</span>
+                    </div>
+                </div>
+                
+                <div class="loading-history" id="loading-history">
+                    <h4>Loading History</h4>
+                    <div class="history-list">
+                        <p class="empty-history">No loading activity yet</p>
+                    </div>
+                </div>
+
+                <div class="export-controls">
+                    <button id="export-loading-list" class="btn btn-secondary">📋 Export Loading List</button>
+                    <button id="export-route-sheet" class="btn btn-secondary">🗺️ Export Route Sheet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Details Modal -->
+    <div id="order-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Order Details</h3>
+                <button id="close-modal" class="close-btn">&times;</button>
+            </div>
+            <div id="modal-body" class="modal-body">
+                <!-- Order details will be populated here -->
+            </div>
+            <div class="modal-footer">
+                <button id="confirm-load" class="btn btn-primary">✅ Confirm Loaded</button>
+                <button id="mark-unloaded" class="btn btn-secondary">❌ Mark Unloaded</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="delivery.js?v=1"></script>
+</body>
+</html>

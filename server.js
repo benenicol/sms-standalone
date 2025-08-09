@@ -109,7 +109,7 @@ app.post('/auth/logout', (req, res) => {
 });
 
 // Import routes with error handling
-let webhookRoutes, smsRoutes;
+let webhookRoutes, smsRoutes, deliveryRoutes;
 try {
   console.log('📦 Loading webhook routes...');
   webhookRoutes = require('./routes/webhook');
@@ -118,6 +118,10 @@ try {
   console.log('📦 Loading SMS routes...');
   smsRoutes = require('./routes/sms');
   console.log('✅ SMS routes loaded');
+  
+  console.log('📦 Loading delivery routes...');
+  deliveryRoutes = require('./routes/delivery');
+  console.log('✅ Delivery routes loaded');
 } catch (error) {
   console.error('❌ Error loading routes:', error.message);
   console.error('Stack:', error.stack);
@@ -154,8 +158,9 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
-// Protected SMS API routes
+// Protected API routes
 app.use('/api/sms', requireAuth, smsRoutes);
+app.use('/api/delivery', requireAuth, deliveryRoutes);
 
 // Serve main interface
 app.get('/', (req, res) => {

@@ -150,14 +150,22 @@ async function fetchOrdersForSMS({ status = 'fulfilled', limit = 50, days = 7, t
           }).join(', ')
         : 'order';
 
+      // Enhanced address information for delivery
+      const shippingAddress = order.shipping_address;
+      const billingAddress = order.billing_address;
+      const deliveryAddress = shippingAddress || billingAddress;
+
       return {
         id: order.id,
         orderNumber: order.order_number || order.name,
+        name: order.name, // Shopify order name (e.g., #1001)
         customer: {
           id: order.customer?.id,
           name: customerName,
           phone: phone,
-          email: order.customer?.email
+          email: order.customer?.email,
+          first_name: order.customer?.first_name,
+          last_name: order.customer?.last_name
         },
         deliveryMethod,
         fulfillmentStatus: order.fulfillment_status || 'unfulfilled',
@@ -165,11 +173,16 @@ async function fetchOrdersForSMS({ status = 'fulfilled', limit = 50, days = 7, t
         tags: order.tags ? order.tags.split(',').map(tag => tag.trim()) : [],
         createdAt: order.created_at,
         totalPrice: order.total_price,
+        total_price: order.total_price,
         subscriptionItems: orderDescription,
+        shipping_lines: order.shipping_lines || [],
+        shipping_address: shippingAddress,
+        billing_address: billingAddress,
         lineItems: order.line_items?.map(item => ({
           name: item.name,
           quantity: item.quantity,
-          price: item.price
+          price: item.price,
+          variant_title: item.variant_title
         })) || []
       };
     });
