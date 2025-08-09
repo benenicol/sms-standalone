@@ -61,7 +61,10 @@ if (isVercel) {
   app.use(helmet());
 }
 
-app.use(cors());
+app.use(cors({
+  credentials: true,
+  origin: true // Allow requests from same origin
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
