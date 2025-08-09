@@ -101,32 +101,19 @@ router.get('/orders', async (req, res) => {
           deliveryMethod: 'Pickup'
         });
       } else {
-        // For deliveries, try to geocode the address
+        // For deliveries, store the address (geocoding will be done during optimization)
         const address = order.shipping_address || order.billing_address;
-        if (address) {
-          const coordinates = await geocodeAddress(address);
-          deliveryOrders.push({
-            ...order,
-            section: 'freezer',
-            deliveryType: 'delivery',
-            deliveryMethod: 'Home Delivery',
-            customer: {
-              ...order.customer,
-              address: {
-                ...address,
-                longitude: coordinates?.longitude,
-                latitude: coordinates?.latitude
-              }
-            }
-          });
-        } else {
-          deliveryOrders.push({
-            ...order,
-            section: 'freezer',
-            deliveryType: 'delivery',
-            deliveryMethod: 'Home Delivery'
-          });
-        }
+        deliveryOrders.push({
+          ...order,
+          section: 'freezer',
+          deliveryType: 'delivery',
+          deliveryMethod: 'Home Delivery',
+          customer: {
+            ...order.customer,
+            address: address
+          },
+          hasAddress: !!address
+        });
       }
     }
 
@@ -174,17 +161,17 @@ router.post('/optimize-route', async (req, res) => {
       });
     }
 
-    // Filter delivery orders only
-    const deliveryOrders = orders.filter(order => {
+    // Filter delivery orders and geocode addresses
+    const rawDeliveryOrders = orders.filter(order => {
       const isDelivery = order.deliveryType === 'delivery';
-      const hasCoordinates = order.customer?.address?.longitude && order.customer?.address?.latitude;
-      console.log('🚚 Order', order.orderNumber, '- isDelivery:', isDelivery, 'hasCoordinates:', hasCoordinates);
-      return isDelivery && hasCoordinates;
+      const hasAddress = order.customer?.address && (order.customer.address.address1 || order.customer.address.city);
+      console.log('🚚 Order', order.orderNumber, '- isDelivery:', isDelivery, 'hasAddress:', hasAddress);
+      return isDelivery && hasAddress;
     });
 
-    console.log('📍 Found', deliveryOrders.length, 'delivery orders with coordinates');
+    console.log('📍 Found', rawDeliveryOrders.length, 'delivery orders with addresses');
 
-    if (deliveryOrders.length === 0) {
+    if (rawDeliveryOrders.length === 0) {
       return res.json({
         success: true,
         optimizedRoute: [],
@@ -193,14 +180,55 @@ router.post('/optimize-route', async (req, res) => {
         debug: {
           totalOrders: orders.length,
           deliveryOrders: orders.filter(o => o.deliveryType === 'delivery').length,
-          ordersWithCoordinates: orders.filter(o => o.customer?.address?.longitude).length
+          ordersWithAddresses: orders.filter(o => o.customer?.address?.address1).length
+        }
+      });
+    }
+
+    // Geocode all delivery addresses
+    console.log('🌍 Geocoding', rawDeliveryOrders.length, 'addresses...');
+    const deliveryOrdersWithCoords = [];
+    
+    for (const order of rawDeliveryOrders) {
+      console.log('📍 Geocoding address for order', order.orderNumber);
+      const coordinates = await geocodeAddress(order.customer.address);
+      
+      if (coordinates && coordinates.longitude && coordinates.latitude) {
+        deliveryOrdersWithCoords.push({
+          ...order,
+          customer: {
+            ...order.customer,
+            address: {
+              ...order.customer.address,
+              longitude: coordinates.longitude,
+              latitude: coordinates.latitude
+            }
+          }
+        });
+        console.log('✅ Geocoded order', order.orderNumber, ':', coordinates);
+      } else {
+        console.log('❌ Failed to geocode order', order.orderNumber);
+      }
+    }
+
+    console.log('🗺️ Successfully geocoded', deliveryOrdersWithCoords.length, 'out of', rawDeliveryOrders.length, 'orders');
+
+    if (deliveryOrdersWithCoords.length === 0) {
+      return res.json({
+        success: true,
+        optimizedRoute: [],
+        packingOrder: [],
+        message: 'No delivery addresses could be geocoded. Check addresses are valid.',
+        debug: {
+          totalDeliveries: rawDeliveryOrders.length,
+          successfulGeocoding: deliveryOrdersWithCoords.length
         }
       });
     }
 
     console.log('🌐 Starting route optimization with OpenRoute Service...');
     const optimization = await optimizeDeliveryRoute(
-      deliveryOrders, 
+      deliveryOrdersWithCoords, 
       FARM_LOCATION, 
       options
     );

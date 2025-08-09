@@ -247,7 +247,7 @@ function displayDeliveryOrders() {
         const customerName = order.customer?.name || 'Unknown Customer';
         const address = order.customer?.address;
         const addressText = address ? 
-            `${address.address1 || ''} ${address.city || ''}`.trim() : 
+            `${address.address1 || ''} ${address.city || ''} ${address.province || ''} ${address.zip || ''}`.trim() : 
             'No address';
         
         html += `
@@ -576,11 +576,13 @@ async function optimizeRoute() {
             return;
         }
 
-        // Log orders with addresses for debugging
+        // Log orders with addresses for debugging  
         const ordersWithAddresses = deliveryOrders.filter(order => 
-            order.customer?.address?.longitude && order.customer?.address?.latitude
+            order.customer?.address && (order.customer.address.address1 || order.customer.address.city)
         );
-        console.log('📍 Orders with coordinates:', ordersWithAddresses.length, 'out of', deliveryOrders.length);
+        console.log('📍 Orders with addresses:', ordersWithAddresses.length, 'out of', deliveryOrders.length);
+        
+        updateStatus('processing', 'Converting addresses to coordinates...');
         
         const response = await fetch('/api/delivery/optimize-route', {
             method: 'POST',
