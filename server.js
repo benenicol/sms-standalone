@@ -73,7 +73,7 @@ app.use(session({
   name: 'allynview_session', // Custom session name without dots
   rolling: true, // Reset expiry on each request
   cookie: {
-    secure: false, // Always false for now to ensure it works
+    secure: false, // Keep false for now to debug session issues
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: 'lax' // Help with session persistence
@@ -93,11 +93,21 @@ const AUTH_PASSWORD = 'allynview2026';
 app.post('/auth/login', (req, res) => {
   const { email, password } = req.body;
   
+  console.log('🔑 Login attempt:', { 
+    email, 
+    sessionID: req.sessionID,
+    sessionBefore: { ...req.session }
+  });
+  
   if (email === AUTH_EMAIL && password === AUTH_PASSWORD) {
     req.session.authenticated = true;
-    console.log('🔑 User authenticated, session ID:', req.sessionID);
-    res.json({ success: true, message: 'Login successful' });
+    console.log('✅ User authenticated successfully:', {
+      sessionID: req.sessionID,
+      sessionAfter: { ...req.session }
+    });
+    res.json({ success: true, message: 'Login successful', sessionID: req.sessionID });
   } else {
+    console.log('❌ Login failed - invalid credentials');
     res.status(401).json({ success: false, message: 'Invalid email or password' });
   }
 });
@@ -149,16 +159,34 @@ app.use('/webhook', webhookRoutes);
 
 // Authentication middleware for HTML pages only
 const requireAuth = (req, res, next) => {
-  console.log('🔐 Auth check for:', req.path, 'Session ID:', req.sessionID, 'Authenticated:', req.session.authenticated);
+  console.log('🔐 Auth check for:', req.path, {
+    sessionID: req.sessionID,
+    authenticated: req.session.authenticated,
+    sessionExists: !!req.session,
+    userAgent: req.get('User-Agent')?.substring(0, 50)
+  });
   
   if (req.session.authenticated) {
+    console.log('✅ Authentication passed for:', req.path);
     return next();
   }
   
   // If it's an API request, return JSON
   if (req.path.startsWith('/api/')) {
-    console.log('❌ API request blocked - not authenticated:', req.path);
-    return res.status(401).json({ success: false, message: 'Authentication required' });
+    console.log('❌ API request blocked - not authenticated:', req.path, {
+      sessionID: req.sessionID,
+      hasSession: !!req.session,
+      authenticated: req.session.authenticated
+    });
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Authentication required',
+      debug: {
+        path: req.path,
+        sessionID: req.sessionID,
+        authenticated: !!req.session.authenticated
+      }
+    });
   }
   
   // Allow static assets (CSS, JS, images) to load without auth
