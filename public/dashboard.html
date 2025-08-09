@@ -284,32 +284,61 @@
         // Load quick stats
         document.addEventListener('DOMContentLoaded', async function() {
             try {
-                // Load order statistics
-                const ordersResponse = await fetch('/api/delivery/orders?days=7');
-                const ordersData = await ordersResponse.json();
+                // First check authentication status
+                const authResponse = await fetch('/auth/status');
+                const authData = await authResponse.json();
                 
-                if (ordersData.success) {
-                    document.getElementById('active-orders').textContent = ordersData.summary?.total || '0';
-                    document.getElementById('pending-deliveries').textContent = ordersData.summary?.deliveries || '0';
-                    document.getElementById('market-pickups').textContent = ordersData.summary?.pickups || '0';
+                if (!authData.authenticated) {
+                    console.log('Not authenticated, redirecting to login');
+                    window.location.href = '/login';
+                    return;
+                }
+
+                // Load order statistics
+                try {
+                    const ordersResponse = await fetch('/api/delivery/orders?days=7');
+                    if (ordersResponse.ok) {
+                        const ordersData = await ordersResponse.json();
+                        
+                        if (ordersData.success) {
+                            document.getElementById('active-orders').textContent = ordersData.summary?.total || '0';
+                            document.getElementById('pending-deliveries').textContent = ordersData.summary?.deliveries || '0';
+                            document.getElementById('market-pickups').textContent = ordersData.summary?.pickups || '0';
+                        }
+                    } else {
+                        console.log('Orders API failed with status:', ordersResponse.status);
+                        throw new Error('Orders API failed');
+                    }
+                } catch (error) {
+                    console.error('Error loading order stats:', error);
+                    document.getElementById('active-orders').textContent = '0';
+                    document.getElementById('pending-deliveries').textContent = '0';
+                    document.getElementById('market-pickups').textContent = '0';
                 }
 
                 // Load conversation statistics
-                const conversationsResponse = await fetch('/api/sms/conversations?limit=10');
-                const conversationsData = await conversationsResponse.json();
-                
-                if (conversationsData.success) {
-                    const unreadCount = conversationsData.conversations?.reduce((count, conv) => 
-                        count + (conv.unreadCount || 0), 0) || 0;
-                    document.getElementById('unread-messages').textContent = unreadCount.toString();
+                try {
+                    const conversationsResponse = await fetch('/api/sms/conversations?limit=10');
+                    if (conversationsResponse.ok) {
+                        const conversationsData = await conversationsResponse.json();
+                        
+                        if (conversationsData.success) {
+                            const unreadCount = conversationsData.conversations?.reduce((count, conv) => 
+                                count + (conv.unreadCount || 0), 0) || 0;
+                            document.getElementById('unread-messages').textContent = unreadCount.toString();
+                        }
+                    } else {
+                        console.log('Conversations API failed with status:', conversationsResponse.status);
+                        throw new Error('Conversations API failed');
+                    }
+                } catch (error) {
+                    console.error('Error loading conversation stats:', error);
+                    document.getElementById('unread-messages').textContent = '0';
                 }
             } catch (error) {
-                console.error('Error loading dashboard stats:', error);
-                // Set fallback values
-                document.getElementById('active-orders').textContent = '0';
-                document.getElementById('pending-deliveries').textContent = '0';
-                document.getElementById('market-pickups').textContent = '0';
-                document.getElementById('unread-messages').textContent = '0';
+                console.error('Error loading dashboard:', error);
+                // If there's a fundamental error, redirect to login
+                window.location.href = '/login';
             }
         });
 

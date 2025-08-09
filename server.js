@@ -67,11 +67,12 @@ app.use(express.urlencoded({ extended: true }));
 
 // Session configuration
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-fallback-secret-key-change-in-production',
+  secret: process.env.SESSION_SECRET || 'allynview-farm-secure-session-key-2024',
   resave: false,
   saveUninitialized: false,
+  name: 'allynview.sid', // Custom session name
   cookie: {
-    secure: false, // Set to false for now to ensure it works on Vercel
+    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: 'lax' // Help with session persistence
@@ -93,10 +94,24 @@ app.post('/auth/login', (req, res) => {
   
   if (email === AUTH_EMAIL && password === AUTH_PASSWORD) {
     req.session.authenticated = true;
+    console.log('🔑 User authenticated, session ID:', req.sessionID);
     res.json({ success: true, message: 'Login successful' });
   } else {
     res.status(401).json({ success: false, message: 'Invalid email or password' });
   }
+});
+
+// Debug auth status endpoint
+app.get('/auth/status', (req, res) => {
+  console.log('🔍 Auth status check:', {
+    sessionID: req.sessionID,
+    authenticated: req.session.authenticated,
+    sessionData: req.session
+  });
+  res.json({ 
+    authenticated: !!req.session.authenticated,
+    sessionID: req.sessionID
+  });
 });
 
 app.post('/auth/logout', (req, res) => {
@@ -144,12 +159,15 @@ app.use(express.static(path.join(__dirname, 'public'), {
 
 // Authentication middleware for HTML pages only
 const requireAuth = (req, res, next) => {
+  console.log('🔐 Auth check for:', req.path, 'Session ID:', req.sessionID, 'Authenticated:', req.session.authenticated);
+  
   if (req.session.authenticated) {
     return next();
   }
   
   // If it's an API request, return JSON
   if (req.path.startsWith('/api/')) {
+    console.log('❌ API request blocked - not authenticated:', req.path);
     return res.status(401).json({ success: false, message: 'Authentication required' });
   }
   
@@ -159,6 +177,7 @@ const requireAuth = (req, res, next) => {
   }
   
   // For HTML requests, redirect to login
+  console.log('↪️ Redirecting to login:', req.path);
   res.redirect('/login');
 };
 
